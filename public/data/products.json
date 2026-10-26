@@ -600,7 +600,7 @@
     "name": "Brownies",
     "category": "Postres",
     "description": "Una novedad dulce está en camino.",
-    "price_usd": 0,
+    "price_usd": 2,
     "image": "",
     "available": false,
     "availability_days": [],

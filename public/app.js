@@ -76,7 +76,7 @@
       button.disabled = !isOrderDay() || cart.length === 0 || needsReview;
       button.setAttribute('aria-describedby', 'orderScheduleNote');
       button.innerHTML = isOrderDay()
-        ? 'Continuar con mis datos <span aria-hidden="true">↗</span>'
+        ? 'Continuar con mis datos <svg class="ico" aria-hidden="true"><use href="#i-arrow"/></svg>'
         : 'Pedidos de viernes a domingo';
     }
   }
@@ -193,6 +193,7 @@
       const dark = !image && index !== 0 ? ' featured-card--dark' : '';
       return `<article class="featured-card${light}${dark}">${picture}<div class="featured-card__top"><span class="featured-card__tag">${index === 0 ? 'UN CLÁSICO' : index === 1 ? 'PARA ANTOJARSE' : 'DE LA CASA'}</span><span class="featured-card__number">0${index + 1}</span></div><div class="featured-card__copy"><p>${escapeHtml(product.category.toUpperCase())}</p><h3>${escapeHtml(product.name)}</h3><div class="featured-card__bottom"><span class="featured-card__price">${currencyUSD(product.price_usd)}</span><button type="button" class="round-add" data-product-slug="${escapeHtml(product.slug)}" ${availability.canOrder ? '' : 'disabled'} aria-label="Elegir ${escapeHtml(product.name)}">+</button></div></div></article>`;
     }).join('');
+    prepReveal($$('.featured-card', target));
   }
   function getMenuProducts() {
     return products.filter(p => p.is_visible && p.brand !== 'dulce' && !p.is_coming_soon).sort((a,b) => a.sort_order - b.sort_order);
@@ -204,7 +205,11 @@
     const cats = [...new Set(allProducts.map(p => p.category))];
     if (activeCategory !== 'Todo' && !cats.includes(activeCategory)) activeCategory = 'Todo';
     const buttons = [{ name: 'Todo', count: allProducts.length }, ...cats.map(name => ({ name, count: allProducts.filter(p => p.category === name).length }))];
+    const prevLeft = target.scrollLeft;
     target.innerHTML = buttons.map(item => `<button type="button" class="category-chip${activeCategory === item.name ? ' is-active' : ''}" data-category="${escapeHtml(item.name)}" aria-pressed="${activeCategory === item.name ? 'true' : 'false'}">${escapeHtml(item.name)} <span class="category-chip__count">${item.count}</span></button>`).join('');
+    target.scrollLeft = prevLeft;
+    const chip = $('.is-active', target);
+    if (chip) target.scrollTo({ left: Math.max(0, chip.offsetLeft - (target.clientWidth - chip.offsetWidth) / 2), behavior: reducedMotion ? 'auto' : 'smooth' });
   }
   function renderProductCard(product) {
     const state = productAvailability(product);
@@ -226,6 +231,7 @@
     }
     $('#menuStatus').textContent = rate ? `${rateIsStale(rate) ? 'AVISO · ' : ''}${rateLabel()}` : 'Los precios base están en USD. La conversión a bolívares no está disponible temporalmente.';
     target.innerHTML = list.length ? list.map(renderProductCard).join('') : `<div class="empty-filter"><strong>No encontramos ese antojo.</strong><p>Prueba con otra palabra o vuelve a ver todas las categorías.</p><button type="button" class="button button--cream" data-category="Todo">Ver todo el menú</button></div>`;
+    prepReveal($$('.product-card', target));
   }
   function renderDulceFeatured() {
     const product = products.find(p => p.slug === 'marquesa-chocolate' && p.is_visible) || products.find(p => p.brand === 'dulce' && !p.is_coming_soon && p.is_visible);
@@ -311,6 +317,7 @@
   function renderCart() {
     const count = cart.reduce((sum, item) => sum + item.quantity, 0);
     $$('[data-cart-count]').forEach(el => { el.textContent = String(count); el.setAttribute('aria-label', `${count} unidades en el pedido`); });
+    $('#mobileOrderBar')?.classList.toggle('is-visible', count > 0);
     const mobileTotal = $('#mobileOrderBar [data-mobile-total]');
     if (mobileTotal) mobileTotal.textContent = currencyUSD(cartProductTotal());
     const empty = cart.length === 0;
@@ -328,7 +335,7 @@
     $('#cartLines').innerHTML = cart.map(line => {
       const product = productFromCatalog(line.slug);
       if (!product) return '';
-      const optionText = line.selections.map(s => `${escapeHtml(s.groupName)}: ${escapeHtml(s.choiceLabel)}${s.quantity > 1 ? ` × ${s.quantity}` : ''}`).join(' · ');
+      const optionText = line.selections.map(s => `${escapeHtml(s.groupName)}: ${escapeHtml(s.choiceLabel)}${s.quantity > 1 ? ` x${s.quantity}` : ''}`).join(' · ');
       const detailParts = [];
       if (optionText) detailParts.push(optionText);
       if (line.note) detailParts.push(`Nota: ${escapeHtml(line.note)}`);
@@ -356,7 +363,8 @@
     line.key = lineKey(line.slug, line.selections, line.note);
     const existing = cart.find(item => item.key === line.key);
     if (existing) existing.quantity = Math.min(99, existing.quantity + line.quantity); else cart.push(line);
-    saveCart(); renderCart(); closeProductDialog(); showToast(`${product.name} añadido al pedido.`);
+    const fromRect = $('#saveProductToCart')?.getBoundingClientRect();
+    saveCart(); renderCart(); closeProductDialog(); flyToCart(fromRect); showToast(`${product.name} añadido al pedido.`);
   }
   function changeCartQuantity(key, delta) {
     const line = cart.find(item => item.key === key);
@@ -407,7 +415,7 @@
       groupsHtml += `<input type="hidden" data-option-min="${escapeHtml(group.id)}" value="${minimum}"><input type="hidden" data-option-max="${escapeHtml(group.id)}" value="${maximum}"></fieldset>`;
     });
     const ves = getConvertedPrice(product.price_usd);
-    $('#productDialogContent').innerHTML = `<div class="product-dialog-content">${visual}<div class="product-dialog__copy"><p class="product-card__category">${escapeHtml(product.category)}</p><h2 id="productDialogTitle">${escapeHtml(product.name)}</h2><p>${escapeHtml(product.description)}</p><div class="product-dialog__price"><strong>${currencyUSD(product.price_usd)}</strong><small>${ves === null ? 'Conversión a Bs. no disponible' : currencyVES(ves) + (rateIsStale(rate) ? ' · tasa anterior' : '')}</small></div><div id="productDialogOptionGroups">${groupsHtml}</div><label class="product-dialog__note"><span>Observaciones de este producto <small>(opcional)</small></span><textarea id="productNote" maxlength="400" rows="3" placeholder="Ej. detalles para preparar este producto">${escapeHtml(line?.note || '')}</textarea></label><p class="product-dialog__error" id="productDialogError" hidden></p><div class="product-dialog__foot"><div class="product-dialog__quantity"><button type="button" id="modalQtyMinus" aria-label="Disminuir cantidad">−</button><output id="modalQtyValue">${modalQuantity}</output><button type="button" id="modalQtyPlus" aria-label="Aumentar cantidad">+</button></div><button type="button" class="button button--red" id="saveProductToCart">${editKey ? 'Guardar cambios' : 'Añadir al pedido'} <span aria-hidden="true">↗</span></button></div></div></div>`;
+    $('#productDialogContent').innerHTML = `<div class="product-dialog-content">${visual}<div class="product-dialog__copy"><p class="product-card__category">${escapeHtml(product.category)}</p><h2 id="productDialogTitle">${escapeHtml(product.name)}</h2><p>${escapeHtml(product.description)}</p><div class="product-dialog__price"><strong>${currencyUSD(product.price_usd)}</strong><small>${ves === null ? 'Conversión a Bs. no disponible' : currencyVES(ves) + (rateIsStale(rate) ? ' · tasa anterior' : '')}</small></div><div id="productDialogOptionGroups">${groupsHtml}</div><label class="product-dialog__note"><span>Observaciones de este producto <small>(opcional)</small></span><textarea id="productNote" maxlength="400" rows="3" placeholder="Ej. detalles para preparar este producto">${escapeHtml(line?.note || '')}</textarea></label><p class="product-dialog__error" id="productDialogError" hidden></p><div class="product-dialog__foot"><div class="product-dialog__quantity"><button type="button" id="modalQtyMinus" aria-label="Disminuir cantidad">−</button><output id="modalQtyValue">${modalQuantity}</output><button type="button" id="modalQtyPlus" aria-label="Aumentar cantidad">+</button></div><button type="button" class="button button--red" id="saveProductToCart">${editKey ? 'Guardar cambios' : 'Añadir al pedido'} <svg class="ico" aria-hidden="true"><use href="#i-arrow"/></svg></button></div></div></div>`;
     const dialog = $('#productDialog');
     if (!dialog.open) dialog.showModal();
     $('#modalQtyMinus').addEventListener('click', () => { modalQuantity = Math.max(1, modalQuantity - 1); $('#modalQtyValue').textContent = modalQuantity; });
@@ -415,7 +423,7 @@
     $('#saveProductToCart').addEventListener('click', saveModalProduct);
     $('#productDialogContent').addEventListener('click', optionQuantityClick);
     $('#productDialogContent').addEventListener('change', optionInputChange);
-    document.body.classList.add('locked');
+    lockScroll();
   }
   function optionInputChange(event) {
     const input = event.target;
@@ -491,26 +499,27 @@
     const dialog = $('#productDialog');
     if (dialog.open) dialog.close();
     modalProduct = null; editingCartKey = null;
-    if (!$('#cartDrawer').classList.contains('is-open')) document.body.classList.remove('locked');
+    if (!$('#cartDrawer').classList.contains('is-open')) unlockScroll();
     if (productDialogLastFocus?.focus) productDialogLastFocus.focus();
   }
 
   function openCart() {
     cartPreviousFocus = document.activeElement;
+    $('#cartDrawer').inert = false;
     const backdrop = $('#cartBackdrop');
     const drawer = $('#cartDrawer');
     backdrop.hidden = false;
-    requestAnimationFrame(() => { backdrop.classList.add('is-open'); drawer.classList.add('is-open'); drawer.setAttribute('aria-hidden','false'); drawer.focus(); });
-    document.body.classList.add('locked');
+    requestAnimationFrame(() => { backdrop.classList.add('is-open'); drawer.classList.add('is-open'); drawer.setAttribute('aria-hidden','false'); $('#closeCart').focus({ preventScroll: true }); });
+    lockScroll();
     $('#cartView').hidden = false; $('#checkoutView').hidden = true;
     renderCart(); $('#closeCart').focus({ preventScroll: true });
   }
   function closeCart() {
     const backdrop = $('#cartBackdrop');
     const drawer = $('#cartDrawer');
-    backdrop.classList.remove('is-open'); drawer.classList.remove('is-open'); drawer.setAttribute('aria-hidden','true');
-    window.setTimeout(() => { if (!drawer.classList.contains('is-open')) backdrop.hidden = true; }, reducedMotion ? 10 : 280);
-    if (!$('#productDialog').open) document.body.classList.remove('locked');
+    backdrop.classList.remove('is-open'); drawer.classList.remove('is-open'); drawer.inert = true; drawer.setAttribute('aria-hidden','true');
+    window.setTimeout(() => { if (!drawer.classList.contains('is-open')) backdrop.hidden = true; }, reducedMotion ? 10 : 420);
+    if (!$('#productDialog').open) unlockScroll();
     if (cartPreviousFocus?.focus) cartPreviousFocus.focus({ preventScroll: true });
   }
   function getSelectedMode() {
@@ -595,7 +604,7 @@
     const reference = String(data.get('reference') || '').trim();
     const orderNotes = String(data.get('orderNotes') || '').trim();
     const modeLabel = mode === 'delivery' ? 'Entrega a domicilio' : mode === 'pickup' ? 'Retiro' : mode;
-    const rows = ['🔥 ¡Hola, Cochi! Quiero consultar y coordinar este pedido.', '', '*DATOS DEL CLIENTE*', `Nombre: ${fullName}`];
+    const rows = ['¡Hola, Cochi! Quiero consultar y coordinar este pedido.', '', '*DATOS DEL CLIENTE*', `Nombre: ${fullName}`];
     if (phone) rows.push(`Teléfono: ${phone}`);
     rows.push(`Modalidad: ${modeLabel}`);
     if (mode === 'delivery') {
@@ -609,14 +618,14 @@
       if (!product) return;
       rows.push(`${index + 1}. ${product.name}`);
       rows.push(`   Cantidad: ${line.quantity}`);
-      const options = line.selections.map(selection => `${selection.groupName}: ${selection.choiceLabel}${selection.quantity > 1 ? ` × ${selection.quantity}` : ''}`);
+      const options = line.selections.map(selection => `${selection.groupName}: ${selection.choiceLabel}${selection.quantity > 1 ? ` x${selection.quantity}` : ''}`);
       if (options.length) rows.push(`   Opciones: ${options.join('; ')}`);
       if (line.note.trim()) rows.push(`   Observaciones: ${line.note.trim()}`);
       rows.push('');
     });
     rows.push('*CONFIRMACIÓN Y PAGO*', 'El monto final, la disponibilidad, el costo de entrega y los datos de pago se confirman directamente por este chat.', 'La preparación del pedido comienza únicamente después de que Cochi reciba el depósito acordado.');
     if (orderNotes) rows.push('', '*NOTAS ADICIONALES*', orderNotes);
-    rows.push('', 'Cochi recibe pedidos únicamente de viernes a domingo.', '¡Gracias! 🐷🔥');
+    rows.push('', 'Cochi recibe pedidos únicamente de viernes a domingo.', '¡Gracias!');
     return rows.join('\n');
   }
   function handleCheckoutSubmit(event) {
@@ -636,6 +645,8 @@
     const message = buildWhatsAppMessage(validation.data);
     const url = `https://wa.me/${number}?text=${encodeURIComponent(message)}`;
     let newWindow = null;
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.matchMedia('(pointer: coarse)').matches;
+    if (isMobile) { window.location.assign(url); return; }
     try { newWindow = window.open(url, '_blank'); if (newWindow) newWindow.opener = null; } catch { newWindow = null; }
     if (!newWindow) window.location.assign(url);
   }
@@ -644,7 +655,7 @@
     const region = $('#toastRegion');
     const toast = document.createElement('div');
     toast.className = 'toast';
-    toast.innerHTML = `<span class="toast__tick" aria-hidden="true">${positive ? '✓' : '!'}</span><span>${escapeHtml(message)}</span>`;
+    toast.innerHTML = `<span class="toast__tick" aria-hidden="true">${positive ? '<svg class="ico" aria-hidden="true"><use href="#i-check"/></svg>' : '!'}</span><span>${escapeHtml(message)}</span>`;
     region.appendChild(toast);
     window.setTimeout(() => toast.remove(), 3400);
   }
@@ -679,29 +690,98 @@
   }
   function setupIntro() {
     const intro = $('#intro');
-    if (!intro) return;
-    let seen = false;
-    try { seen = sessionStorage.getItem(INTRO_KEY) === '1'; } catch { /* storage blocked */ }
-    const dismiss = () => {
-      intro.classList.add('is-hidden');
-      window.setTimeout(() => intro.remove(), reducedMotion ? 5 : 500);
-      try { sessionStorage.setItem(INTRO_KEY, '1'); } catch { /* no storage */ }
-    };
-    if (seen || document.visibilityState === 'prerender') {
-      intro.classList.add('is-hidden'); window.setTimeout(() => intro.remove(), 20); return;
-    }
-    window.setTimeout(dismiss, reducedMotion ? 180 : 1550);
-    intro.addEventListener('click', dismiss, { once:true });
+    return new Promise(resolve => {
+      const finish = () => { document.body.classList.add('is-ready'); resolve(); };
+      let seen = false;
+      try { seen = sessionStorage.getItem(INTRO_KEY) === '1'; } catch { /* storage blocked */ }
+      if (!intro || seen) { intro?.remove(); finish(); return; }
+      document.documentElement.classList.add('is-intro');
+      let done = false;
+      const dismiss = () => {
+        if (done) return; done = true;
+        intro.classList.add('is-hidden');
+        document.documentElement.classList.remove('is-intro');
+        try { sessionStorage.setItem(INTRO_KEY, '1'); } catch { /* no storage */ }
+        window.setTimeout(finish, reducedMotion ? 0 : 450);
+        window.setTimeout(() => intro.remove(), reducedMotion ? 5 : 1000);
+      };
+      window.setTimeout(dismiss, reducedMotion ? 180 : 2500);
+      intro.addEventListener('click', dismiss, { once: true });
+    });
+  }
+  let revealObserver = null, revealReady = false, lockedY = 0;
+  function prepReveal(nodes) {
+    nodes.forEach((node, i) => {
+      node.classList.add('reveal', 'reveal--pop'); node.style.setProperty('--i', i % 6);
+      if (revealReady) revealObserver ? revealObserver.observe(node) : node.classList.add('is-revealed');
+    });
   }
   function setupReveal() {
+    revealReady = true;
     const items = $$('.reveal');
     if (!('IntersectionObserver' in window) || reducedMotion) { items.forEach(item => item.classList.add('is-revealed')); return; }
-    const observer = new IntersectionObserver(entries => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) { entry.target.classList.add('is-revealed'); observer.unobserve(entry.target); }
-      });
-    }, { threshold:0.12, rootMargin:'0px 0px -25px 0px' });
-    items.forEach(item => observer.observe(item));
+    revealObserver = new IntersectionObserver(entries => entries.forEach(entry => {
+      if (!entry.isIntersecting) return;
+      const el = entry.target; el.classList.add('is-revealed'); revealObserver.unobserve(el);
+      window.setTimeout(() => el.classList.add('is-done'), 1500);
+    }), { threshold: 0.12, rootMargin: '0px 0px -25px 0px' });
+    items.forEach(item => revealObserver.observe(item));
+  }
+  function lockScroll() {
+    if (document.body.classList.contains('locked')) return;
+    lockedY = window.scrollY; document.body.style.top = `-${lockedY}px`; document.body.classList.add('locked');
+  }
+  function unlockScroll() {
+    if (!document.body.classList.contains('locked')) return;
+    document.body.classList.remove('locked'); document.body.style.top = '';
+    window.scrollTo({ top: lockedY, behavior: 'instant' });
+  }
+  function splitWords(root, counter = { n: 0 }) {
+    Array.from(root.childNodes).forEach(node => {
+      if (node.nodeType === 3) {
+        const frag = document.createDocumentFragment();
+        node.textContent.split(/(\s+)/).forEach(token => {
+          if (!token) return;
+          if (/^\s+$/.test(token)) { frag.appendChild(document.createTextNode(token)); return; }
+          const wrap = document.createElement('span'), inner = document.createElement('span');
+          wrap.className = 'w'; inner.textContent = token; inner.style.setProperty('--i', counter.n++); wrap.appendChild(inner); frag.appendChild(wrap);
+        });
+        node.replaceWith(frag);
+      } else if (node.nodeType === 1 && node.tagName !== 'BR') splitWords(node, counter);
+    });
+  }
+  function splitHeadings() {
+    $$('.hero h1, .section-heading h2, .menu-title-row h2, .dulce-copy h2, .sunday-copy h2, .attitude-copy h2').forEach(el => splitWords(el));
+  }
+  function bump(el) { if (!el) return; el.classList.remove('is-bump'); void el.offsetWidth; el.classList.add('is-bump'); }
+  function flyToCart(from) {
+    const bar = $('#mobileOrderBar button');
+    const target = bar && bar.offsetParent !== null ? bar : $('.cart-trigger');
+    bump(target);
+    if (reducedMotion || !from || !target.animate) return;
+    const to = target.getBoundingClientRect();
+    const x0 = from.left + from.width / 2 - 22, y0 = from.top + from.height / 2 - 23;
+    const x1 = to.left + to.width / 2 - 22, y1 = to.top + to.height / 2 - 23;
+    const dot = document.createElement('img');
+    dot.src = '/assets/brand/cochi-isotipo-red.png'; dot.alt = ''; dot.className = 'fly-dot';
+    document.body.appendChild(dot);
+    dot.animate([
+      { transform: `translate(${x0}px,${y0}px) scale(.6) rotate(0deg)`, opacity: 1 },
+      { transform: `translate(${(x0 + x1) / 2}px,${Math.min(y0, y1) - 110}px) scale(1.3) rotate(170deg)`, opacity: 1, offset: .5 },
+      { transform: `translate(${x1}px,${y1}px) scale(.3) rotate(340deg)`, opacity: .9 }
+    ], { duration: 780, easing: 'cubic-bezier(.45,0,.25,1)' }).onfinish = () => dot.remove();
+  }
+  function setupScrollFx() {
+    let ticking = false;
+    const update = () => {
+      ticking = false;
+      if (document.body.classList.contains('locked')) return;
+      const max = document.documentElement.scrollHeight - window.innerHeight;
+      document.documentElement.style.setProperty('--sp', max > 0 ? Math.min(1, window.scrollY / max).toFixed(4) : 0);
+      $('#top')?.classList.toggle('is-scrolled', window.scrollY > 12);
+    };
+    window.addEventListener('scroll', () => { if (!ticking) { ticking = true; requestAnimationFrame(update); } }, { passive: true });
+    update();
   }
   function setupEvents() {
     document.addEventListener('click', event => {
@@ -772,7 +852,7 @@
     });
     $('#productDialog').addEventListener('close', () => {
       modalProduct = null; editingCartKey = null;
-      if (!$('#cartDrawer').classList.contains('is-open')) document.body.classList.remove('locked');
+      if (!$('#cartDrawer').classList.contains('is-open')) unlockScroll();
     });
     $('.dialog-close-form').addEventListener('submit', event => { event.preventDefault(); closeProductDialog(); });
     document.addEventListener('keydown', event => {
@@ -782,7 +862,7 @@
         closeMobileNav();
       }
     });
-    window.addEventListener('scroll', () => $('#top')?.classList.toggle('is-scrolled', window.scrollY > 12), { passive:true });
+    setupScrollFx();
     $('#currentYear').textContent = new Date().getFullYear();
   }
   function closeMobileNav() {
@@ -792,14 +872,17 @@
   }
 
   async function boot() {
-    setupIntro();
+    const introDone = setupIntro();
+    splitHeadings();
     setupEvents();
     updateScheduleNotice();
     await loadConfig();
     await loadProducts();
     loadCart();
     renderFeatured(); renderProducts(); renderDulceFeatured(); renderCart(); renderModes();
+    $$('[data-price-of]').forEach(el => { const p = productFromCatalog(el.dataset.priceOf); if (p) el.textContent = currencyUSD(p.price_usd).replace('.00', ''); });
     updateScheduleNotice();
+    await introDone;
     setupReveal();
     if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
       // Offline-first/PWA no se registra aún: se evita cachear precios o catálogo antiguos.

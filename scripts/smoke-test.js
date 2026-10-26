@@ -13,7 +13,7 @@ const html = fs.readFileSync(path.join(publicDir, 'index.html'), 'utf8');
 const app = fs.readFileSync(path.join(publicDir, 'app.js'), 'utf8');
 const css = fs.readFileSync(path.join(publicDir, 'styles.css'), 'utf8');
 
-function ok(message) { console.log(`✓ ${message}`); }
+function ok(message) { console.log(`OK: ${message}`); }
 async function waitForServer(url, child) {
   const deadline = Date.now() + 5000;
   while (Date.now() < deadline) {
