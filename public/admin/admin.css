@@ -26,7 +26,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--red);box
 .tabs{position:sticky;top:calc(53px + env(safe-area-inset-top));z-index:19;display:flex;gap:8px;overflow-x:auto;padding:10px 16px;background:var(--paper);scrollbar-width:none}
 .tabs::-webkit-scrollbar{display:none}
 .tab{flex:none;min-height:44px;padding:0 18px;border:2px solid var(--ink);border-radius:99px;background:transparent;font-weight:800;font-size:13.5px;cursor:pointer;transition:background .2s,color .2s}
-.tab[aria-selected=true]{background:var(--ink);color:var(--paper)}
+.tab[aria-current=page]{background:var(--ink);color:var(--paper)}
 .banner{margin:6px 16px 0;padding:12px 14px;border-radius:14px;background:#fff3c9;color:#5c4400;font-size:13px;font-weight:700}
 .banner--bad{background:#fde4e2;color:#8c0b06}
 main{padding:12px 16px 20px;max-width:760px;margin:0 auto;display:grid;gap:14px}
@@ -69,3 +69,9 @@ main{padding:12px 16px 20px;max-width:760px;margin:0 auto;display:grid;gap:14px}
 @media (min-width:700px){.row3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}}
 @media (max-width:420px){.prow__main{grid-template-columns:48px 1fr 96px}.thumb{width:48px;height:48px}.row2{grid-template-columns:1fr}.item--flyer{grid-template-columns:1fr}.item--flyer .thumb{width:100%;height:auto;aspect-ratio:4/5}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+.sr-only{position:absolute!important;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;border:0}
+.chip{display:inline-block;justify-self:start;margin:0;padding:5px 12px;border-radius:99px;font-size:12px;font-weight:800}
+.chip--on{background:#d8f0df;color:#14532d}.chip--soon{background:#fff3c9;color:#5c4400}.chip--off{background:#fde4e2;color:#8c0b06}
+:where(a,button,input,select,textarea):focus-visible{outline:3px solid var(--ink);outline-offset:3px;box-shadow:0 0 0 6px var(--paper)}
+.savebar :focus-visible,.login :focus-visible{outline-color:#fff;box-shadow:0 0 0 6px var(--ink)}

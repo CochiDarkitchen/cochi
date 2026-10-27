@@ -120,6 +120,27 @@ async function waitForServer(url, child) {
     const fake = await fetch(`${base}/api/admin/upload`, { method: 'POST', headers: auth, body: JSON.stringify({ dataUrl: `data:image/webp;base64,${Buffer.from('no soy una imagen').toString('base64')}` }) });
     assert.equal(fake.status, 400, 'Un archivo que no es imagen se rechaza.');
     ok('Panel admin: login, sesión segura, guardado validado, protección de origen y subida de imágenes.');
+    const withExtras = JSON.parse(JSON.stringify(draft));
+    withExtras.products[0].tag = 'Más pedido'; withExtras.settings.paymentInfo = 'Pago Móvil 0424-0000000'; withExtras.flyers[0].start = '2026-11-01'; withExtras.flyers[0].end = '2026-11-03';
+    assert.equal((await put(withExtras)).status, 200);
+    const saved = await (await fetch(`${base}/api/content`)).json();
+    assert.equal(saved.products[0].tag, 'Más pedido'); assert.equal(saved.settings.paymentInfo, 'Pago Móvil 0424-0000000'); assert.equal(saved.flyers[0].end, '2026-11-03');
+    const backwards = JSON.parse(JSON.stringify(withExtras)); backwards.flyers[0].end = '2026-10-01';
+    assert.equal((await put(backwards)).status, 400, 'La fecha final no puede ser anterior a la inicial.');
+    const badDate = JSON.parse(JSON.stringify(withExtras)); badDate.upsells[0].start = '31/10/2026';
+    assert.equal((await put(badDate)).status, 400, 'Las fechas deben tener formato AAAA-MM-DD.');
+    ok('Etiquetas, datos de pago y fechas de inicio/fin: se guardan y se validan.');
+
+    // ---- App instalable y vista previa ----
+    const manifest = await (await fetch(`${base}/manifest.webmanifest`)).json();
+    assert.equal(manifest.display, 'standalone'); assert.ok(manifest.icons.some(i => i.purpose === 'maskable'));
+    for (const icon of manifest.icons) assert.equal((await fetch(`${base}${icon.src}`)).status, 200, `Falta el ícono ${icon.src}`);
+    const worker = await fetch(`${base}/sw.js`); assert.equal(worker.status, 200); assert.equal(worker.headers.get('cache-control'), 'no-cache');
+    assert.equal((await fetch(`${base}/offline.html`)).status, 200);
+    assert.ok(/og:image"[^>]*data-abs/.test(html) && html.includes('rel="manifest"') && html.includes('rel="apple-touch-icon"'), 'Faltan etiquetas para compartir o instalar.');
+    assert.ok(!app.includes('caches.open') && fs.readFileSync(path.join(publicDir, 'sw.js'), 'utf8').includes("request.mode === 'navigate'"));
+    ok('App instalable (manifiesto, íconos, service worker) y etiquetas para compartir listos.');
+
   } finally {
     child.kill('SIGTERM');
   }

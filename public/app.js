@@ -29,7 +29,10 @@
   let productDialogLastFocus = null;
   let contentApi = null;
   let extras = { announcements: [], upsells: [], flyers: [], testimonials: [] };
-  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const MOTION_KEY = 'cochi-motion-off';
+  let reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches || (() => { try { return localStorage.getItem(MOTION_KEY) === '1'; } catch { return false; } })();
+  let pendingOrder = null;
+  let installEvent = null;
 
   function escapeHtml(value) {
     return String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
@@ -135,6 +138,7 @@
       is_coming_soon: Boolean(row.is_coming_soon),
       featured: Boolean(row.featured),
       brand: row.brand === 'dulce' ? 'dulce' : 'cochi',
+      tag: String(row.tag ?? '').slice(0, 16),
       sort_order: Number(row.sort_order ?? 999),
       options: Array.isArray(row.options) ? row.options : []
     };
@@ -193,7 +197,7 @@
         : `<div class="featured-card__placeholder">${defaultGraphic(product, true)}</div>`;
       const light = !image && index === 0 ? ' featured-card--light' : '';
       const dark = !image && index !== 0 ? ' featured-card--dark' : '';
-      return `<article class="featured-card${light}${dark}">${picture}<div class="featured-card__top"><span class="featured-card__tag">${index === 0 ? 'UN CLÁSICO' : index === 1 ? 'PARA ANTOJARSE' : 'DE LA CASA'}</span><span class="featured-card__number">0${index + 1}</span></div><div class="featured-card__copy"><p>${escapeHtml(product.category.toUpperCase())}</p><h3>${escapeHtml(product.name)}</h3><div class="featured-card__bottom"><span class="featured-card__price">${currencyUSD(product.price_usd)}</span><button type="button" class="round-add" data-product-slug="${escapeHtml(product.slug)}" ${availability.canOrder ? '' : 'disabled'} aria-label="Elegir ${escapeHtml(product.name)}">+</button></div></div></article>`;
+      return `<article class="featured-card${light}${dark}">${picture}<div class="featured-card__top"><span class="featured-card__tag">${product.tag ? escapeHtml(product.tag.toUpperCase()) : index === 0 ? 'UN CLÁSICO' : index === 1 ? 'PARA ANTOJARSE' : 'DE LA CASA'}</span><span class="featured-card__number">0${index + 1}</span></div><div class="featured-card__copy"><p>${escapeHtml(product.category.toUpperCase())}</p><h3>${escapeHtml(product.name)}</h3><div class="featured-card__bottom"><span class="featured-card__price">${currencyUSD(product.price_usd)}</span><button type="button" class="round-add" data-product-slug="${escapeHtml(product.slug)}" ${availability.canOrder ? '' : 'disabled'} aria-label="Elegir ${escapeHtml(product.name)}">+</button></div></div></article>`;
     }).join('');
     prepReveal($$('.featured-card', target));
   }
@@ -208,7 +212,7 @@
     if (activeCategory !== 'Todo' && !cats.includes(activeCategory)) activeCategory = 'Todo';
     const buttons = [{ name: 'Todo', count: allProducts.length }, ...cats.map(name => ({ name, count: allProducts.filter(p => p.category === name).length }))];
     const prevLeft = target.scrollLeft;
-    target.innerHTML = buttons.map(item => `<button type="button" class="category-chip${activeCategory === item.name ? ' is-active' : ''}" data-category="${escapeHtml(item.name)}" aria-pressed="${activeCategory === item.name ? 'true' : 'false'}">${escapeHtml(item.name)} <span class="category-chip__count">${item.count}</span></button>`).join('');
+    target.innerHTML = buttons.map(item => `<button type="button" class="category-chip${activeCategory === item.name ? ' is-active' : ''}" aria-pressed="${activeCategory === item.name}" data-category="${escapeHtml(item.name)}" aria-pressed="${activeCategory === item.name ? 'true' : 'false'}">${escapeHtml(item.name)} <span class="category-chip__count">${item.count}</span></button>`).join('');
     target.scrollLeft = prevLeft;
     const chip = $('.is-active', target);
     if (chip) target.scrollTo({ left: Math.max(0, chip.offsetLeft - (target.clientWidth - chip.offsetWidth) / 2), behavior: reducedMotion ? 'auto' : 'smooth' });
@@ -216,7 +220,7 @@
   function renderProductCard(product) {
     const state = productAvailability(product);
     const hasPhoto = Boolean(safeAssetPath(product.image));
-    const visual = hasPhoto ? `<div class="product-card__visual"><img src="${escapeHtml(safeAssetPath(product.image))}" alt="${escapeHtml(`Fotografía promocional de ${product.name}`)}" loading="lazy" decoding="async" width="600" height="420"><div class="product-card__badges">${product.featured ? '<span class="product-badge">FAVORITO</span>' : '<span></span>'}${state.label ? `<span class="product-badge ${state.type === 'out' ? 'product-badge--out' : state.type === 'soon' ? 'product-badge--soon' : 'product-badge--sunday'}">${escapeHtml(state.label)}</span>` : ''}</div></div>` : `<div class="product-card__visual">${defaultGraphic(product)}<div class="product-card__badges">${product.featured ? '<span class="product-badge">FAVORITO</span>' : '<span></span>'}${state.label ? `<span class="product-badge ${state.type === 'out' ? 'product-badge--out' : state.type === 'soon' ? 'product-badge--soon' : 'product-badge--sunday'}">${escapeHtml(state.label)}</span>` : ''}</div></div>`;
+    const visual = hasPhoto ? `<div class="product-card__visual"><img src="${escapeHtml(safeAssetPath(product.image))}" alt="${escapeHtml(`Fotografía promocional de ${product.name}`)}" loading="lazy" decoding="async" width="600" height="420"><div class="product-card__badges">${tagBadge(product)}${product.featured ? '<span class="product-badge">FAVORITO</span>' : '<span></span>'}${state.label ? `<span class="product-badge ${state.type === 'out' ? 'product-badge--out' : state.type === 'soon' ? 'product-badge--soon' : 'product-badge--sunday'}">${escapeHtml(state.label)}</span>` : ''}</div></div>` : `<div class="product-card__visual">${defaultGraphic(product)}<div class="product-card__badges">${tagBadge(product)}${product.featured ? '<span class="product-badge">FAVORITO</span>' : '<span></span>'}${state.label ? `<span class="product-badge ${state.type === 'out' ? 'product-badge--out' : state.type === 'soon' ? 'product-badge--soon' : 'product-badge--sunday'}">${escapeHtml(state.label)}</span>` : ''}</div></div>`;
     const coming = product.is_coming_soon;
     return `<article class="product-card${product.brand === 'dulce' ? ' product-card--dulce' : ''}${!state.canOrder && !coming ? ' product-card--unavailable' : ''}" data-product-card="${escapeHtml(product.slug)}">
       ${visual}<div class="product-card__content"><p class="product-card__category">${escapeHtml(product.category)}</p><h3 class="product-card__title">${escapeHtml(product.name)}</h3><p class="product-card__desc">${escapeHtml(product.description)}</p><div class="product-card__bottom">${coming ? '<div class="product-price"><strong>Muy pronto</strong><small>Estamos preparando algo</small></div>' : productPriceMarkup(product)}<button type="button" class="product-card__add" data-product-slug="${escapeHtml(product.slug)}" ${state.canOrder ? '' : 'disabled'} aria-label="${state.canOrder ? 'Elegir ' + escapeHtml(product.name) : escapeHtml(state.reason)}">${state.canOrder ? 'Elegir' : state.type === 'day' ? 'No disponible' : state.type === 'soon' ? 'Próximamente' : 'Agotado'} ${state.canOrder ? '<span aria-hidden="true">+</span>' : ''}</button></div></div></article>`;
@@ -323,6 +327,7 @@
     const count = cart.reduce((sum, item) => sum + item.quantity, 0);
     $$('[data-cart-count]').forEach(el => { el.textContent = String(count); el.setAttribute('aria-label', `${count} unidades en el pedido`); });
     $('#mobileOrderBar')?.classList.toggle('is-visible', count > 0);
+    document.body.classList.toggle('has-cart', count > 0);
     const mobileTotal = $('#mobileOrderBar [data-mobile-total]');
     if (mobileTotal) mobileTotal.textContent = currencyUSD(cartProductTotal());
     const empty = cart.length === 0;
@@ -428,7 +433,7 @@
     const upsellBlock = rule && upProduct && productAvailability(upProduct).canOrder
       ? `<label class="upsell-card"><input type="checkbox" id="upsellCheck" data-upsell-rule="${escapeHtml(rule.id)}"><span class="upsell-card__img">${upsellThumb(upProduct)}</span><span class="upsell-card__copy"><strong>${escapeHtml(rule.title)}</strong><small>${escapeHtml(upProduct.name)} por ${currencyUSD(promoPrice(rule))}${promoSaving(rule) > 0 ? ` <s>${currencyUSD(upProduct.price_usd)}</s>` : ''}</small></span>${promoSaving(rule) > 0 ? `<span class="upsell-card__save">Ahorras ${currencyUSD(promoSaving(rule))}</span>` : ''}<span class="upsell-card__tick"><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg></span></label>` : '';
     const ves = getConvertedPrice(product.price_usd);
-    $('#productDialogContent').innerHTML = `<div class="product-dialog-content">${visual}<div class="product-dialog__copy"><p class="product-card__category">${escapeHtml(product.category)}</p><h2 id="productDialogTitle">${escapeHtml(product.name)}</h2><p>${escapeHtml(product.description)}</p><div class="product-dialog__price"><strong>${currencyUSD(product.price_usd)}</strong><small>${ves === null ? 'Conversión a Bs. no disponible' : currencyVES(ves) + (rateIsStale(rate) ? ' · tasa anterior' : '')}</small></div><div id="productDialogOptionGroups">${groupsHtml}</div>${upsellBlock}<label class="product-dialog__note"><span>Observaciones de este producto <small>(opcional)</small></span><textarea id="productNote" maxlength="400" rows="3" placeholder="Ej. detalles para preparar este producto">${escapeHtml(line?.note || '')}</textarea></label><p class="product-dialog__error" id="productDialogError" hidden></p><div class="product-dialog__foot"><div class="product-dialog__quantity"><button type="button" id="modalQtyMinus" aria-label="Disminuir cantidad">−</button><output id="modalQtyValue">${modalQuantity}</output><button type="button" id="modalQtyPlus" aria-label="Aumentar cantidad">+</button></div><button type="button" class="button button--red" id="saveProductToCart">${editKey ? 'Guardar cambios' : 'Añadir al pedido'} <svg class="ico" aria-hidden="true"><use href="#i-arrow"/></svg></button></div></div></div>`;
+    $('#productDialogContent').innerHTML = `<div class="product-dialog-content">${visual}<div class="product-dialog__copy"><p class="product-card__category">${escapeHtml(product.category)}${product.tag ? `<span class="dialog-tag">${escapeHtml(product.tag)}</span>` : ''}</p><h2 id="productDialogTitle">${escapeHtml(product.name)}</h2><p>${escapeHtml(product.description)}</p><div class="product-dialog__price"><strong>${currencyUSD(product.price_usd)}</strong><small>${ves === null ? 'Conversión a Bs. no disponible' : currencyVES(ves) + (rateIsStale(rate) ? ' · tasa anterior' : '')}</small></div><div id="productDialogOptionGroups">${groupsHtml}</div>${upsellBlock}<label class="product-dialog__note"><span>Observaciones de este producto <small>(opcional)</small></span><textarea id="productNote" maxlength="400" rows="3" placeholder="Ej. detalles para preparar este producto">${escapeHtml(line?.note || '')}</textarea></label><p class="product-dialog__error" id="productDialogError" hidden></p><div class="product-dialog__foot"><div class="product-dialog__quantity"><button type="button" id="modalQtyMinus" aria-label="Disminuir cantidad">−</button><output id="modalQtyValue">${modalQuantity}</output><button type="button" id="modalQtyPlus" aria-label="Aumentar cantidad">+</button></div><button type="button" class="button button--red" id="saveProductToCart">${editKey ? 'Guardar cambios' : 'Añadir al pedido'} <svg class="ico" aria-hidden="true"><use href="#i-arrow"/></svg></button></div></div></div>`;
     const dialog = $('#productDialog');
     if (!dialog.open) dialog.showModal();
     $('#modalQtyMinus').addEventListener('click', () => { modalQuantity = Math.max(1, modalQuantity - 1); $('#modalQtyValue').textContent = modalQuantity; });
@@ -519,19 +524,19 @@
 
   function openCart() {
     cartPreviousFocus = document.activeElement;
-    $('#cartDrawer').inert = false;
+    $('#cartDrawer').inert = false; setPageInert(true);
     const backdrop = $('#cartBackdrop');
     const drawer = $('#cartDrawer');
     backdrop.hidden = false;
     requestAnimationFrame(() => { backdrop.classList.add('is-open'); drawer.classList.add('is-open'); drawer.setAttribute('aria-hidden','false'); $('#closeCart').focus({ preventScroll: true }); });
     lockScroll();
-    $('#cartView').hidden = false; $('#checkoutView').hidden = true;
+    $('#cartView').hidden = false; $('#checkoutView').hidden = true; $('#confirmView').hidden = true;
     renderCart(); $('#closeCart').focus({ preventScroll: true });
   }
   function closeCart() {
     const backdrop = $('#cartBackdrop');
     const drawer = $('#cartDrawer');
-    backdrop.classList.remove('is-open'); drawer.classList.remove('is-open'); drawer.inert = true; drawer.setAttribute('aria-hidden','true');
+    backdrop.classList.remove('is-open'); drawer.classList.remove('is-open'); drawer.inert = true; setPageInert(false); drawer.setAttribute('aria-hidden','true');
     window.setTimeout(() => { if (!drawer.classList.contains('is-open')) backdrop.hidden = true; }, reducedMotion ? 10 : 420);
     if (!$('#productDialog').open) unlockScroll();
     if (cartPreviousFocus?.focus) cartPreviousFocus.focus({ preventScroll: true });
@@ -599,13 +604,13 @@
     if (invalidFields.length) {
       invalidFields.forEach(([name, message]) => {
         const field = $(`[name="${name}"]`, form);
-        field?.setAttribute('aria-invalid','true');
+        field?.setAttribute('aria-invalid','true'); field?.setAttribute('aria-describedby','checkoutError');
       });
       const first = $(`[name="${invalidFields[0][0]}"]`, form);
       first?.focus();
       return { ok:false, message:invalidFields[0][1] };
     }
-    $$('input,textarea', form).forEach(el => el.removeAttribute('aria-invalid'));
+    $$('input,textarea', form).forEach(el => { el.removeAttribute('aria-invalid'); el.removeAttribute('aria-describedby'); });
     error.hidden = true;
     return { ok:true, data };
   }
@@ -657,13 +662,43 @@
       $('#checkoutError').hidden = false;
       return;
     }
-    const message = buildWhatsAppMessage(validation.data);
-    const url = `https://wa.me/${number}?text=${encodeURIComponent(message)}`;
-    let newWindow = null;
+    pendingOrder = { data: validation.data, number };
+    showConfirm();
+  }
+  function showConfirm() {
+    renderConfirm();
+    $('#checkoutView').hidden = true; $('#confirmView').hidden = false; $('#confirmFallback').hidden = true;
+    $('#cartDrawer').scrollTop = 0;
+    $('#confirmTitle').focus({ preventScroll: true });
+  }
+  function renderConfirm() {
+    const data = pendingOrder.data, mode = String(data.get('orderMode') || getSelectedMode());
+    $('#confirmLines').innerHTML = cart.map(line => {
+      const product = productFromCatalog(line.slug); if (!product) return '';
+      const extra = [...line.selections.map(s => `${escapeHtml(s.groupName)}: ${escapeHtml(s.choiceLabel)}${s.quantity > 1 ? ` x${s.quantity}` : ''}`), line.note ? `Nota: ${escapeHtml(line.note)}` : ''].filter(Boolean).join(' · ');
+      return `<li><span class="confirm-lines__qty">${line.quantity}x</span><span class="confirm-lines__name">${escapeHtml(product.name)}${line.promo ? '<span class="promo-tag">PROMO</span>' : ''}${extra ? `<small>${extra}</small>` : ''}</span><span class="confirm-lines__price">${currencyUSD(lineUnitPrice(line) * line.quantity)}</span></li>`;
+    }).join('');
+    const total = cartProductTotal(), ves = getConvertedPrice(total), fee = cartFee(mode);
+    $('#confirmTotals').innerHTML = `<div><dt>Productos</dt><dd>${currencyUSD(total)}</dd></div>${ves === null ? '' : `<div><dt>Estimado en Bs.</dt><dd>${currencyVES(ves)}</dd></div>`}${mode === 'delivery' ? `<div><dt>Entrega</dt><dd>${fee === null ? 'Se confirma por WhatsApp' : currencyUSD(fee)}</dd></div>` : ''}`;
+    const rows = [['Nombre', data.get('customerName')], ['Teléfono', data.get('customerPhone')], ['Modalidad', mode === 'delivery' ? 'Entrega a domicilio' : 'Retiro'], ...(mode === 'delivery' ? [['Dirección', data.get('address')], ['Sector', data.get('sector')], ['Referencia', data.get('reference')]] : []), ['Notas', data.get('orderNotes')]];
+    $('#confirmData').innerHTML = rows.filter(([, value]) => String(value || '').trim()).map(([label, value]) => `<div><dt>${label}</dt><dd>${escapeHtml(String(value).trim())}</dd></div>`).join('');
+    const pay = String(config.paymentInfo || '').trim();
+    $('#confirmPay').hidden = !pay; $('#confirmPayText').textContent = pay;
+  }
+  function sendPendingOrder() {
+    if (!pendingOrder) return;
+    const url = `https://wa.me/${pendingOrder.number}?text=${encodeURIComponent(buildWhatsAppMessage(pendingOrder.data))}`;
+    $('#confirmFallbackLink').href = url; $('#confirmFallback').hidden = false;
     const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.matchMedia('(pointer: coarse)').matches;
     if (isMobile) { window.location.assign(url); return; }
-    try { newWindow = window.open(url, '_blank'); if (newWindow) newWindow.opener = null; } catch { newWindow = null; }
-    if (!newWindow) window.location.assign(url);
+    let opened = null;
+    try { opened = window.open(url, '_blank'); if (opened) opened.opener = null; } catch { opened = null; }
+    if (!opened) window.location.assign(url);
+  }
+  async function copyPaymentInfo() {
+    const text = $('#confirmPayText').textContent;
+    try { await navigator.clipboard.writeText(text); showToast('Datos de pago copiados.'); }
+    catch { const range = document.createRange(); range.selectNodeContents($('#confirmPayText')); const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range); showToast('Selecciona y copia los datos de pago.', false); }
   }
 
   function showToast(message, positive = true) {
@@ -704,8 +739,64 @@
       .sort((a,b) => a.sort_order - b.sort_order);
   }
 
+  /* ---------- Accesibilidad, WhatsApp flotante y app instalable ---------- */
+  // Mantiene el foco del teclado dentro del carrito mientras está abierto.
+  function trapDrawerFocus(event) {
+    const drawer = $('#cartDrawer');
+    if (event.key !== 'Tab' || !drawer.classList.contains('is-open')) return;
+    const items = $$('a[href],button:not([disabled]),input:not([disabled]):not([type="hidden"]),select,textarea,[tabindex]:not([tabindex="-1"])', drawer).filter(el => el.offsetParent !== null);
+    if (!items.length) return;
+    const first = items[0], last = items[items.length - 1];
+    if (event.shiftKey && (document.activeElement === first || !drawer.contains(document.activeElement))) { event.preventDefault(); last.focus(); }
+    else if (!event.shiftKey && (document.activeElement === last || !drawer.contains(document.activeElement))) { event.preventDefault(); first.focus(); }
+  }
+  function setPageInert(on) { ['#top', 'main', '.site-footer', '.skip-link', '#waFab'].forEach(sel => { const el = $(sel); if (el) el.inert = on; }); }
+  function setupFab() {
+    const fab = $('#waFab'); if (!fab) return;
+    const number = String(config.whatsappNumber || '').replace(/\D/g, '');
+    if (number.length < 10) return;
+    fab.href = `https://wa.me/${number}?text=${encodeURIComponent('¡Hola, Cochi! Tengo una duda sobre el menú.')}`;
+    fab.hidden = false;
+  }
+  function applyMotionPreference() {
+    document.documentElement.classList.toggle('motion-off', reducedMotion);
+    const button = $('#motionToggle'); if (!button) return;
+    const manual = (() => { try { return localStorage.getItem(MOTION_KEY) === '1'; } catch { return false; } })();
+    button.setAttribute('aria-pressed', String(manual));
+    button.textContent = manual ? 'Reanudar animaciones' : 'Pausar animaciones';
+    button.hidden = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  }
+  function setupMotionToggle() {
+    $('#motionToggle')?.addEventListener('click', () => {
+      let manual = false; try { manual = localStorage.getItem(MOTION_KEY) === '1'; } catch { /* sin almacenamiento */ }
+      manual = !manual;
+      try { localStorage.setItem(MOTION_KEY, manual ? '1' : '0'); } catch { /* sin almacenamiento */ }
+      reducedMotion = manual || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      applyMotionPreference(); showToast(manual ? 'Animaciones en pausa.' : 'Animaciones activadas.');
+    });
+    applyMotionPreference();
+  }
+  function setupInstall() {
+    const button = $('#installBtn');
+    const standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+    const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    if (!button || standalone) return;
+    if (isIOS) button.hidden = false;
+    window.addEventListener('beforeinstallprompt', event => { event.preventDefault(); installEvent = event; button.hidden = false; });
+    window.addEventListener('appinstalled', () => { installEvent = null; button.hidden = true; showToast('Cochi quedó instalada en tu celular.'); });
+    button.addEventListener('click', async () => {
+      if (installEvent) { installEvent.prompt(); await installEvent.userChoice.catch(() => {}); installEvent = null; button.hidden = true; }
+      else if (isIOS) showToast('En tu iPhone: toca el botón Compartir y elige "Añadir a pantalla de inicio".');
+    });
+  }
+  function registerServiceWorker() {
+    if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('/sw.js').catch(() => { /* la app funciona igual sin service worker */ });
+  }
+
   /* ---------- Sugerencias al pedir (promos) ---------- */
-  function upsellRules() { return (extras.upsells || []).filter(rule => rule && rule.active !== false && productFromCatalog(rule.add_slug)); }
+  function inWindow(item) { const today = todayInCaracas(); return (!item.start || today >= item.start) && (!item.end || today <= item.end); }
+  function tagBadge(product) { return product.tag ? `<span class="product-badge product-badge--tag">${escapeHtml(product.tag)}</span>` : ''; }
+  function upsellRules() { return (extras.upsells || []).filter(rule => rule && rule.active !== false && inWindow(rule) && productFromCatalog(rule.add_slug)); }
   function upsellRule(id) { return (extras.upsells || []).find(rule => rule && rule.id === id); }
   function promoPrice(rule) { const product = productFromCatalog(rule.add_slug); return product ? Math.min(Number(rule.price_usd), Number(product.price_usd)) : 0; }
   function promoSaving(rule) { const product = productFromCatalog(rule.add_slug); return product ? Math.max(0, Number(product.price_usd) - promoPrice(rule)) : 0; }
@@ -729,7 +820,7 @@
     let changed = false;
     cart.filter(line => line.promo).forEach(line => {
       const rule = upsellRule(line.promo);
-      if (!rule || rule.active === false || rule.add_slug !== line.slug) { delete line.promo; line.key = lineKey(line.slug, line.selections, line.note); changed = true; }
+      if (!rule || rule.active === false || !inWindow(rule) || rule.add_slug !== line.slug) { delete line.promo; line.key = lineKey(line.slug, line.selections, line.note); changed = true; }
     });
     const merged = [];
     cart.forEach(line => { const same = merged.find(item => item.key === line.key); if (same) { same.quantity = Math.min(99, same.quantity + line.quantity); changed = true; } else merged.push(line); });
@@ -780,17 +871,19 @@
   }
   function renderFlyers() {
     const section = $('#flyers'), track = $('#flyersTrack');
-    const items = (extras.flyers || []).filter(f => f && f.active !== false && safeAssetPath(f.image));
+    const items = (extras.flyers || []).filter(f => f && f.active !== false && inWindow(f) && safeAssetPath(f.image));
     section.hidden = !items.length;
     $$('[data-flyers-nav]').forEach(link => { link.hidden = !items.length; });
     if (!items.length) { track.innerHTML = ''; return; }
     track.innerHTML = items.map((flyer, index) => {
       const target = flyerLink(flyer.link);
       const label = escapeHtml(flyer.linkLabel || 'Ver más');
+      const aria = escapeHtml(`${flyer.linkLabel || 'Ver más'}: ${flyer.title || 'flyer'}`);
+      const until = flyer.end ? `<span class="flyer-card__until">Válido hasta el ${formatDate(flyer.end)}</span>` : '';
       const cta = !flyer.link ? '' : target.type === 'product'
-        ? `<button type="button" class="flyer-card__cta" data-product-slug="${escapeHtml(target.value)}">${label} <svg class="ico" aria-hidden="true"><use href="#i-arrow"/></svg></button>`
-        : `<a class="flyer-card__cta" href="${escapeHtml(target.value)}"${target.type === 'url' ? ' target="_blank" rel="noopener noreferrer"' : ''}>${label} <svg class="ico" aria-hidden="true"><use href="#i-arrow"/></svg></a>`;
-      return `<article class="flyer-card" role="listitem" style="--tilt:${index % 2 ? 1.2 : -1.2}deg"><div class="flyer-card__media"><img src="${escapeHtml(safeAssetPath(flyer.image))}" alt="${escapeHtml(flyer.title || 'Flyer de Cochi')}" width="720" height="900" loading="lazy">${flyer.badge ? `<span class="flyer-card__badge">${escapeHtml(flyer.badge)}</span>` : ''}</div><div class="flyer-card__body">${flyer.title ? `<h3>${escapeHtml(flyer.title)}</h3>` : ''}${flyer.text ? `<p>${escapeHtml(flyer.text)}</p>` : ''}${cta}</div></article>`;
+        ? `<button type="button" class="flyer-card__cta" aria-label="${aria}" data-product-slug="${escapeHtml(target.value)}">${label} <svg class="ico" aria-hidden="true"><use href="#i-arrow"/></svg></button>`
+        : `<a class="flyer-card__cta" aria-label="${aria}" href="${escapeHtml(target.value)}"${target.type === 'url' ? ' target="_blank" rel="noopener noreferrer"' : ''}>${label} <svg class="ico" aria-hidden="true"><use href="#i-arrow"/></svg></a>`;
+      return `<article class="flyer-card" role="listitem" style="--tilt:${index % 2 ? 1.2 : -1.2}deg"><div class="flyer-card__media"><img src="${escapeHtml(safeAssetPath(flyer.image))}" alt="${escapeHtml(flyer.title || 'Flyer de Cochi')}" width="720" height="900" loading="lazy">${flyer.badge ? `<span class="flyer-card__badge">${escapeHtml(flyer.badge)}</span>` : ''}</div><div class="flyer-card__body">${flyer.title ? `<h3>${escapeHtml(flyer.title)}</h3>` : ''}${flyer.text ? `<p>${escapeHtml(flyer.text)}</p>` : ''}${until}${cta}</div></article>`;
     }).join('');
     prepReveal($$('.flyer-card', track));
   }
@@ -819,12 +912,14 @@
       let seen = false;
       try { seen = sessionStorage.getItem(INTRO_KEY) === '1'; } catch { /* storage blocked */ }
       if (!intro || seen) { intro?.remove(); finish(); return; }
-      document.documentElement.classList.add('is-intro');
+      document.documentElement.classList.add('is-intro'); setPageInert(true);
       let done = false;
+      const onKey = event => { if (['Escape', 'Enter', ' '].includes(event.key)) { event.preventDefault(); dismiss(); } };
+      document.addEventListener('keydown', onKey);
       const dismiss = () => {
         if (done) return; done = true;
         intro.classList.add('is-hidden');
-        document.documentElement.classList.remove('is-intro');
+        document.documentElement.classList.remove('is-intro'); setPageInert(false); document.removeEventListener('keydown', onKey);
         try { sessionStorage.setItem(INTRO_KEY, '1'); } catch { /* no storage */ }
         window.setTimeout(finish, reducedMotion ? 0 : 450);
         window.setTimeout(() => intro.remove(), reducedMotion ? 5 : 1000);
@@ -966,6 +1061,9 @@
       $('[name="customerName"]', $('#checkoutForm')).focus({ preventScroll:true });
     });
     $('#backToCart').addEventListener('click', () => { $('#checkoutView').hidden = true; $('#cartView').hidden = false; });
+    $('#backToData').addEventListener('click', () => { $('#confirmView').hidden = true; $('#checkoutView').hidden = false; $('#cartDrawer').scrollTop = 0; $('#checkoutForm [name="customerName"]')?.focus({ preventScroll: true }); });
+    $('#confirmSend').addEventListener('click', sendPendingOrder);
+    $('#copyPay').addEventListener('click', copyPaymentInfo);
     $('#checkoutForm').addEventListener('submit', handleCheckoutSubmit);
     $('#checkoutForm').addEventListener('change', event => {
       if (event.target.name === 'orderMode') { updateDeliveryFields(); renderCheckoutSummary(); }
@@ -1003,6 +1101,8 @@
 
   async function boot() {
     const introDone = setupIntro();
+    setupInstall(); setupMotionToggle();
+    document.addEventListener('keydown', trapDrawerFocus);
     splitHeadings();
     setupEvents();
     updateScheduleNotice();
@@ -1016,9 +1116,8 @@
     updateScheduleNotice();
     await introDone;
     setupReveal();
-    if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
-      // Offline-first/PWA no se registra aún: se evita cachear precios o catálogo antiguos.
-    }
+    setupFab();
+    registerServiceWorker();
     // Sincroniza el carrito entre pestañas del mismo navegador.
     window.addEventListener('storage', event => {
       if (event.key === CART_KEY) { try { cart = hydrateCart(JSON.parse(event.newValue || '[]')); renderCart(); } catch {} }

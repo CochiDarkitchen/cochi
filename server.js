@@ -17,7 +17,7 @@ const PORT = Number(process.env.PORT || 4173);
 const mime = {
   '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
   '.json': 'application/json; charset=utf-8', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
-  '.webp': 'image/webp', '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.txt': 'text/plain; charset=utf-8'
+  '.webp': 'image/webp', '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.txt': 'text/plain; charset=utf-8', '.webmanifest': 'application/manifest+json; charset=utf-8'
 };
 
 const server = http.createServer((req, res) => {
@@ -35,6 +35,7 @@ const server = http.createServer((req, res) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
     res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+    if (pathname === '/sw.js') res.setHeader('Cache-Control', 'no-cache');
     if (pathname.startsWith('/admin/')) { res.setHeader('Cache-Control', 'no-store'); res.setHeader('X-Robots-Tag', 'noindex, nofollow'); }
     if (pathname === '/data/settings.json' || pathname === '/data/products.json') res.setHeader('Cache-Control', 'no-store, max-age=0');
     fs.createReadStream(file).pipe(res);

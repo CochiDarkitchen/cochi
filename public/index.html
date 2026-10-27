@@ -6,10 +6,25 @@
   <meta name="theme-color" content="#ebe0bf">
   <meta name="description" content="Explora el menú de Cochi, arma tu pedido y envíalo por WhatsApp. Sabor con personalidad, desde Cochi Dark Kitchen hasta Cochi Dulce.">
   <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Cochi">
+  <meta property="og:locale" content="es_VE">
   <meta property="og:title" content="Cochi — El antojo tiene nombre">
-  <meta property="og:description" content="Explora el menú, arma tu pedido y escríbenos por WhatsApp.">
-  <meta property="og:image" content="/assets/ui/og-cochi.jpg">
+  <meta property="og:description" content="Shawarmas, costillas BBQ y más. Arma tu pedido y envíalo por WhatsApp. Pedidos de viernes a domingo.">
+  <meta property="og:url" content="/" data-abs>
+  <meta property="og:image" content="/assets/ui/og-cochi.jpg" data-abs>
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Cochi Dark Kitchen: el antojo tiene nombre">
   <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Cochi — El antojo tiene nombre">
+  <meta name="twitter:description" content="Shawarmas, costillas BBQ y más. Arma tu pedido y envíalo por WhatsApp.">
+  <meta name="twitter:image" content="/assets/ui/og-cochi.jpg" data-abs>
+  <link rel="canonical" href="/" data-abs>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Cochi">
   <title>Cochi — El antojo tiene nombre</title>
   <link rel="icon" type="image/png" href="/assets/brand/favicon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -20,7 +35,7 @@
   <script defer src="/app.js"></script>
 </head>
 <body>
-  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs><symbol id="i-arrow" viewBox="0 0 24 24"><path d="M7 17 17 7M8 7h9v9"/></symbol><symbol id="i-spark" viewBox="0 0 24 24"><path fill="currentColor" stroke="none" d="M12 0c.8 6.4 5.2 10.9 12 12-6.8 1.1-11.2 5.6-12 12-.8-6.4-5.2-10.9-12-12C6.8 10.9 11.2 6.4 12 0Z"/></symbol><symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol></defs></svg>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs><symbol id="i-arrow" viewBox="0 0 24 24"><path d="M7 17 17 7M8 7h9v9"/></symbol><symbol id="i-spark" viewBox="0 0 24 24"><path fill="currentColor" stroke="none" d="M12 0c.8 6.4 5.2 10.9 12 12-6.8 1.1-11.2 5.6-12 12-.8-6.4-5.2-10.9-12-12C6.8 10.9 11.2 6.4 12 0Z"/></symbol><symbol id="i-chat" viewBox="0 0 24 24"><path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8Z"/></symbol><symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol></defs></svg>
   <a class="skip-link" href="#menu">Saltar al menú</a>
 
   <div class="intro" id="intro" aria-label="Bienvenido a Cochi" role="status">
@@ -188,6 +203,7 @@
 
   <footer class="site-footer">
     <div class="section-wrap footer-main"><div class="footer-brand"><img src="/assets/brand/cochi-logo-cream.png" alt="Cochi" width="165" height="58"><p>El antojo tiene nombre.</p></div><div class="footer-nav"><span>LA SIGUIENTE JUGADA</span><a href="#menu">Ver menú</a><a href="#cochi-dulce">Cochi Dulce</a><button type="button" data-open-cart>Mi pedido</button></div><div class="footer-cta"><p>¿Listo para pedir<br><em>algo brutal?</em></p><a class="button button--cream" href="#menu">Arma tu pedido <svg class="ico" aria-hidden="true"><use href="#i-arrow"/></svg></a></div></div>
+    <div class="section-wrap footer-tools"><button type="button" class="tool-btn" id="installBtn" hidden>Instalar Cochi en mi celular</button><button type="button" class="tool-btn" id="motionToggle" aria-pressed="false">Pausar animaciones</button></div>
     <div class="section-wrap footer-bottom"><span>© <span id="currentYear"></span> COCHI · DARK KITCHEN</span><span>HECHO CON ANTOJO <b aria-hidden="true"><svg class="ico spark" aria-hidden="true"><use href="#i-spark"/></svg></b></span></div>
   </footer>
 
@@ -211,12 +227,25 @@
         <p class="checkout-disclaimer">WhatsApp se abrirá con tu pedido preparado. El equipo de Cochi confirmará disponibilidad, monto final, entrega y datos de pago. La preparación comienza únicamente después de recibir el depósito acordado.</p>
       </form>
     </div>
+    <div class="confirm-view" id="confirmView" hidden>
+      <button type="button" class="back-link" id="backToData"><svg class="ico ico--back" aria-hidden="true"><use href="#i-arrow"/></svg> Editar mis datos</button>
+      <p class="eyebrow"><span class="eyebrow__line"></span> ÚLTIMO PASO</p>
+      <h3 id="confirmTitle" tabindex="-1">Revisa y <em>confirma.</em></h3>
+      <section class="confirm-card" aria-labelledby="cfOrder"><h4 id="cfOrder">Tu pedido</h4><ul class="confirm-lines" id="confirmLines"></ul><dl class="confirm-totals" id="confirmTotals"></dl></section>
+      <section class="confirm-card" aria-labelledby="cfData"><h4 id="cfData">Tus datos</h4><dl class="confirm-data" id="confirmData"></dl></section>
+      <section class="confirm-card" aria-labelledby="cfSteps"><h4 id="cfSteps">Qué pasa ahora</h4><ol class="confirm-steps"><li>Se abre WhatsApp con tu pedido ya escrito. Solo tienes que enviarlo.</li><li>Cochi confirma disponibilidad, monto final y costo de entrega.</li><li>Envías el depósito acordado y empezamos a preparar tu pedido.</li></ol></section>
+      <section class="confirm-card" id="confirmPay" aria-labelledby="cfPay" hidden><h4 id="cfPay">Datos para el depósito</h4><p class="confirm-pay" id="confirmPayText"></p><button type="button" class="button button--outline" id="copyPay">Copiar datos</button></section>
+      <button type="button" class="button button--green button--wide" id="confirmSend"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.2 11.6a8.3 8.3 0 0 1-12.3 7.3L3 20l1.1-4.7A8.3 8.3 0 1 1 20.2 11.6Z"/><path d="M8.2 7.8c.3-.6.6-.6.9-.6h.5c.2 0 .4.1.5.4l.7 1.7c.1.2.1.4 0 .6l-.5.7c-.2.2-.2.4 0 .6.4.7 1.1 1.3 1.8 1.7.3.2.5.2.7 0l.7-.8c.2-.2.4-.2.7-.1l1.6.8c.3.1.4.3.4.5 0 .4-.2 1.1-.7 1.5-.6.5-1.3.7-2.1.5-1-.2-2.3-.8-3.5-2-1.4-1.3-2.3-2.8-2.5-3.8-.2-.7 0-1.4.4-1.9Z"/></svg> Enviar por WhatsApp</button>
+      <p class="confirm-fallback" id="confirmFallback" role="status" hidden>¿No se abrió WhatsApp? <a id="confirmFallbackLink" href="/" target="_blank" rel="noopener noreferrer">Toca aquí para abrirlo</a>.</p>
+      <p class="checkout-disclaimer">La preparación comienza únicamente después de recibir el depósito acordado.</p>
+    </div>
   </aside>
 
   <dialog class="product-dialog" id="productDialog" aria-labelledby="productDialogTitle">
     <form method="dialog" class="dialog-close-form"><button class="icon-button" aria-label="Cerrar producto"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></form>
     <div id="productDialogContent"></div>
   </dialog>
+  <a class="wa-fab" id="waFab" href="https://wa.me/" target="_blank" rel="noopener noreferrer" hidden><svg class="ico" aria-hidden="true"><use href="#i-chat"/></svg><span class="wa-fab__text" aria-hidden="true">¿Dudas?</span><span class="sr-only">Escríbenos por WhatsApp si tienes dudas (se abre en otra pestaña)</span></a>
   <div id="toastRegion" class="toast-region" aria-live="polite" aria-atomic="true"></div>
   <noscript><div class="noscript-message">Para consultar el menú completo y armar pedidos, activa JavaScript en tu navegador.</div></noscript>
 </body>
