@@ -1,6 +1,19 @@
 {
   "headers": [
     {
+      "source": "/admin/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
+        },
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
       "source": "/data/settings.json",
       "headers": [
         {
@@ -11,6 +24,15 @@
     },
     {
       "source": "/data/products.json",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        }
+      ]
+    },
+    {
+      "source": "/data/extras.json",
       "headers": [
         {
           "key": "Cache-Control",

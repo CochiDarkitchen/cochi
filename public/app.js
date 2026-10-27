@@ -27,6 +27,8 @@
   let modalQuantity = 1;
   let lastToastTimer = null;
   let productDialogLastFocus = null;
+  let contentApi = null;
+  let extras = { announcements: [], upsells: [], flyers: [], testimonials: [] };
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   function escapeHtml(value) {
@@ -275,13 +277,14 @@
       const note = String(item.note || '').slice(0, 400);
       const line = { slug: product.slug, quantity: Math.max(1, Math.min(99, Number(item.quantity || 1))), selections: normalized.selections, note, needsReview: normalized.needsReview };
       line.key = lineKey(line.slug, line.selections, line.note);
+      if (item.promo && upsellRule(item.promo)) { line.promo = String(item.promo); line.key += `::promo:${line.promo}`; }
       const existing = result.find(c => c.key === line.key);
       if (existing) existing.quantity = Math.min(99, existing.quantity + line.quantity); else result.push(line);
     });
     return result;
   }
   function saveCart() {
-    try { localStorage.setItem(CART_KEY, JSON.stringify(cart.map(({ slug, quantity, selections, note }) => ({ slug, quantity, selections, note })))); } catch { /* el carrito sigue funcionando en memoria */ }
+    try { localStorage.setItem(CART_KEY, JSON.stringify(cart.map(({ slug, quantity, selections, note, promo }) => ({ slug, quantity, selections, note, promo })))); } catch { /* el carrito sigue funcionando en memoria */ }
   }
   function loadCart() {
     try { cart = hydrateCart(JSON.parse(localStorage.getItem(CART_KEY) || '[]')); }
@@ -293,6 +296,7 @@
     return group?.choices?.find(c => c.id === selection.choiceId);
   }
   function lineUnitPrice(line) {
+    if (line.promo) { const rule = upsellRule(line.promo); if (rule) return promoPrice(rule); }
     const product = productFromCatalog(line.slug);
     if (!product) return 0;
     let total = Number(product.price_usd || 0);
@@ -315,12 +319,14 @@
     return cartProductTotal() + (fee === null ? 0 : fee);
   }
   function renderCart() {
+    if (normalizePromos()) saveCart();
     const count = cart.reduce((sum, item) => sum + item.quantity, 0);
     $$('[data-cart-count]').forEach(el => { el.textContent = String(count); el.setAttribute('aria-label', `${count} unidades en el pedido`); });
     $('#mobileOrderBar')?.classList.toggle('is-visible', count > 0);
     const mobileTotal = $('#mobileOrderBar [data-mobile-total]');
     if (mobileTotal) mobileTotal.textContent = currencyUSD(cartProductTotal());
     const empty = cart.length === 0;
+    renderCartUpsells();
     $('#cartEmpty').hidden = !empty;
     $('#cartLines').hidden = empty;
     $('#cartBottom').hidden = empty;
@@ -339,8 +345,9 @@
       const detailParts = [];
       if (optionText) detailParts.push(optionText);
       if (line.note) detailParts.push(`Nota: ${escapeHtml(line.note)}`);
+      if (line.promo) { const promoRule = upsellRule(line.promo); if (promoRule && promoSaving(promoRule) > 0) detailParts.push(`Promo con tu pedido: ahorras ${currencyUSD(promoSaving(promoRule))} c/u`); }
       if (line.needsReview) detailParts.push('<strong style="color:#b30e08">Revisa las opciones antes de continuar.</strong>');
-      return `<article class="cart-line" data-cart-line="${escapeHtml(line.key)}"><div><div class="cart-line__name">${escapeHtml(product.name)}</div>${detailParts.length ? `<div class="cart-line__details">${detailParts.join('<br>')}</div>` : ''}<div class="cart-line__actions"><div class="qty-stepper"><button type="button" data-line-qty="-1" data-line-key="${escapeHtml(line.key)}" aria-label="Disminuir cantidad">−</button><span>${line.quantity}</span><button type="button" data-line-qty="1" data-line-key="${escapeHtml(line.key)}" aria-label="Aumentar cantidad">+</button></div><span class="cart-line__unit">${currencyUSD(lineUnitPrice(line))} c/u</span><button type="button" class="line-edit" data-edit-line="${escapeHtml(line.key)}">Editar</button></div><button type="button" class="cart-line__remove" data-remove-line="${escapeHtml(line.key)}">Eliminar</button></div><div class="cart-line__total">${currencyUSD(lineUnitPrice(line) * line.quantity)}</div></article>`;
+      return `<article class="cart-line" data-cart-line="${escapeHtml(line.key)}"><div><div class="cart-line__name">${escapeHtml(product.name)}${line.promo ? '<span class="promo-tag">PROMO</span>' : ''}</div>${detailParts.length ? `<div class="cart-line__details">${detailParts.join('<br>')}</div>` : ''}<div class="cart-line__actions"><div class="qty-stepper"><button type="button" data-line-qty="-1" data-line-key="${escapeHtml(line.key)}" aria-label="Disminuir cantidad">−</button><span>${line.quantity}</span><button type="button" data-line-qty="1" data-line-key="${escapeHtml(line.key)}" aria-label="Aumentar cantidad">+</button></div><span class="cart-line__unit">${currencyUSD(lineUnitPrice(line))} c/u</span>${line.promo ? '' : `<button type="button" class="line-edit" data-edit-line="${escapeHtml(line.key)}">Editar</button>`}</div><button type="button" class="cart-line__remove" data-remove-line="${escapeHtml(line.key)}">Eliminar</button></div><div class="cart-line__total">${currencyUSD(lineUnitPrice(line) * line.quantity)}</div></article>`;
     }).join('');
     const total = cartProductTotal();
     $('#cartSubtotalUsd').textContent = currencyUSD(total);
@@ -354,7 +361,7 @@
     $('#startCheckout').title = invalid ? 'Revisa las opciones o disponibilidad de los productos.' : '';
     if ($('#checkoutView').hidden === false) renderCheckoutSummary();
   }
-  function addProductToCart(product, selections, note, quantity) {
+  function addProductToCart(product, selections, note, quantity, promoRuleToAdd = null) {
     const state = productAvailability(product);
     if (!state.canOrder) { showToast(state.reason || 'Este producto no está disponible.', false); return; }
     const normalized = getSelectedCurrentOptions(product, selections);
@@ -364,7 +371,9 @@
     const existing = cart.find(item => item.key === line.key);
     if (existing) existing.quantity = Math.min(99, existing.quantity + line.quantity); else cart.push(line);
     const fromRect = $('#saveProductToCart')?.getBoundingClientRect();
-    saveCart(); renderCart(); closeProductDialog(); flyToCart(fromRect); showToast(`${product.name} añadido al pedido.`);
+    if (promoRuleToAdd) addPromoUnits(promoRuleToAdd, line.quantity);
+    saveCart(); renderCart(); closeProductDialog(); flyToCart(fromRect);
+    showToast(promoRuleToAdd ? `${product.name} y ${productFromCatalog(promoRuleToAdd.add_slug)?.name || 'tu promo'} añadidos al pedido.` : `${product.name} añadido al pedido.`);
   }
   function changeCartQuantity(key, delta) {
     const line = cart.find(item => item.key === key);
@@ -414,8 +423,12 @@
       });
       groupsHtml += `<input type="hidden" data-option-min="${escapeHtml(group.id)}" value="${minimum}"><input type="hidden" data-option-max="${escapeHtml(group.id)}" value="${maximum}"></fieldset>`;
     });
+    const rule = !editKey ? ruleForProduct(product) : null;
+    const upProduct = rule ? productFromCatalog(rule.add_slug) : null;
+    const upsellBlock = rule && upProduct && productAvailability(upProduct).canOrder
+      ? `<label class="upsell-card"><input type="checkbox" id="upsellCheck" data-upsell-rule="${escapeHtml(rule.id)}"><span class="upsell-card__img">${upsellThumb(upProduct)}</span><span class="upsell-card__copy"><strong>${escapeHtml(rule.title)}</strong><small>${escapeHtml(upProduct.name)} por ${currencyUSD(promoPrice(rule))}${promoSaving(rule) > 0 ? ` <s>${currencyUSD(upProduct.price_usd)}</s>` : ''}</small></span>${promoSaving(rule) > 0 ? `<span class="upsell-card__save">Ahorras ${currencyUSD(promoSaving(rule))}</span>` : ''}<span class="upsell-card__tick"><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg></span></label>` : '';
     const ves = getConvertedPrice(product.price_usd);
-    $('#productDialogContent').innerHTML = `<div class="product-dialog-content">${visual}<div class="product-dialog__copy"><p class="product-card__category">${escapeHtml(product.category)}</p><h2 id="productDialogTitle">${escapeHtml(product.name)}</h2><p>${escapeHtml(product.description)}</p><div class="product-dialog__price"><strong>${currencyUSD(product.price_usd)}</strong><small>${ves === null ? 'Conversión a Bs. no disponible' : currencyVES(ves) + (rateIsStale(rate) ? ' · tasa anterior' : '')}</small></div><div id="productDialogOptionGroups">${groupsHtml}</div><label class="product-dialog__note"><span>Observaciones de este producto <small>(opcional)</small></span><textarea id="productNote" maxlength="400" rows="3" placeholder="Ej. detalles para preparar este producto">${escapeHtml(line?.note || '')}</textarea></label><p class="product-dialog__error" id="productDialogError" hidden></p><div class="product-dialog__foot"><div class="product-dialog__quantity"><button type="button" id="modalQtyMinus" aria-label="Disminuir cantidad">−</button><output id="modalQtyValue">${modalQuantity}</output><button type="button" id="modalQtyPlus" aria-label="Aumentar cantidad">+</button></div><button type="button" class="button button--red" id="saveProductToCart">${editKey ? 'Guardar cambios' : 'Añadir al pedido'} <svg class="ico" aria-hidden="true"><use href="#i-arrow"/></svg></button></div></div></div>`;
+    $('#productDialogContent').innerHTML = `<div class="product-dialog-content">${visual}<div class="product-dialog__copy"><p class="product-card__category">${escapeHtml(product.category)}</p><h2 id="productDialogTitle">${escapeHtml(product.name)}</h2><p>${escapeHtml(product.description)}</p><div class="product-dialog__price"><strong>${currencyUSD(product.price_usd)}</strong><small>${ves === null ? 'Conversión a Bs. no disponible' : currencyVES(ves) + (rateIsStale(rate) ? ' · tasa anterior' : '')}</small></div><div id="productDialogOptionGroups">${groupsHtml}</div>${upsellBlock}<label class="product-dialog__note"><span>Observaciones de este producto <small>(opcional)</small></span><textarea id="productNote" maxlength="400" rows="3" placeholder="Ej. detalles para preparar este producto">${escapeHtml(line?.note || '')}</textarea></label><p class="product-dialog__error" id="productDialogError" hidden></p><div class="product-dialog__foot"><div class="product-dialog__quantity"><button type="button" id="modalQtyMinus" aria-label="Disminuir cantidad">−</button><output id="modalQtyValue">${modalQuantity}</output><button type="button" id="modalQtyPlus" aria-label="Aumentar cantidad">+</button></div><button type="button" class="button button--red" id="saveProductToCart">${editKey ? 'Guardar cambios' : 'Añadir al pedido'} <svg class="ico" aria-hidden="true"><use href="#i-arrow"/></svg></button></div></div></div>`;
     const dialog = $('#productDialog');
     if (!dialog.open) dialog.showModal();
     $('#modalQtyMinus').addEventListener('click', () => { modalQuantity = Math.max(1, modalQuantity - 1); $('#modalQtyValue').textContent = modalQuantity; });
@@ -428,6 +441,7 @@
   function optionInputChange(event) {
     const input = event.target;
     if (!(input instanceof HTMLInputElement)) return;
+    if (input.id === 'upsellCheck') { input.closest('.upsell-card')?.classList.toggle('is-on', input.checked); return; }
     if (input.dataset.optionMulti) {
       const key = `${input.dataset.optionGroup}:${input.dataset.optionChoice}`;
       const qty = $(`[data-option-qty-current="${CSS.escape(key)}"]`, $('#productDialogContent'));
@@ -493,7 +507,7 @@
       const duplicate = cart.find(item => item.key === newLine.key);
       if (duplicate) duplicate.quantity = Math.min(99, duplicate.quantity + newLine.quantity); else cart.push(newLine);
       saveCart(); renderCart(); closeProductDialog(); showToast('Cambios guardados en tu pedido.');
-    } else addProductToCart(product, selections, note, modalQuantity);
+    } else { const upsellInput = $('#upsellCheck'); addProductToCart(product, selections, note, modalQuantity, upsellInput?.checked ? upsellRule(upsellInput.dataset.upsellRule) : null); }
   }
   function closeProductDialog() {
     const dialog = $('#productDialog');
@@ -618,6 +632,7 @@
       if (!product) return;
       rows.push(`${index + 1}. ${product.name}`);
       rows.push(`   Cantidad: ${line.quantity}`);
+      if (line.promo) { const promoRule = upsellRule(line.promo); if (promoRule) rows.push(`   Promo: ${promoRule.title}`); }
       const options = line.selections.map(selection => `${selection.groupName}: ${selection.choiceLabel}${selection.quantity > 1 ? ` x${selection.quantity}` : ''}`);
       if (options.length) rows.push(`   Opciones: ${options.join('; ')}`);
       if (line.note.trim()) rows.push(`   Observaciones: ${line.note.trim()}`);
@@ -667,7 +682,7 @@
   }
   async function loadConfig() {
     try {
-      const settings = await fetch('/data/settings.json', { cache: 'no-store' }).then(readJSONResponse);
+      const settings = contentApi?.settings || await fetch('/data/settings.json', { cache: 'no-store' }).then(readJSONResponse);
       config = { ...defaultConfig, ...settings };
     } catch {
       config = { ...defaultConfig };
@@ -681,12 +696,121 @@
   }
   async function loadProducts() {
     let localProducts = [];
-    try { localProducts = await fetch('/data/products.json', { cache: 'no-store' }).then(readJSONResponse); }
+    try { localProducts = contentApi?.products || await fetch('/data/products.json', { cache: 'no-store' }).then(readJSONResponse); }
     catch { localProducts = []; }
     products = (Array.isArray(localProducts) ? localProducts : [])
       .map(normalizeProduct)
       .filter(product => product.slug && product.name)
       .sort((a,b) => a.sort_order - b.sort_order);
+  }
+
+  /* ---------- Sugerencias al pedir (promos) ---------- */
+  function upsellRules() { return (extras.upsells || []).filter(rule => rule && rule.active !== false && productFromCatalog(rule.add_slug)); }
+  function upsellRule(id) { return (extras.upsells || []).find(rule => rule && rule.id === id); }
+  function promoPrice(rule) { const product = productFromCatalog(rule.add_slug); return product ? Math.min(Number(rule.price_usd), Number(product.price_usd)) : 0; }
+  function promoSaving(rule) { const product = productFromCatalog(rule.add_slug); return product ? Math.max(0, Number(product.price_usd) - promoPrice(rule)) : 0; }
+  function ruleForProduct(product) { return upsellRules().find(rule => (rule.when_categories || []).includes(product.category) && rule.add_slug !== product.slug); }
+  function promoUnits(rule) { return cart.filter(line => line.promo === rule.id).reduce((sum, line) => sum + line.quantity, 0); }
+  function promoAllowed(rule) {
+    const units = cart.filter(line => !line.promo).reduce((sum, line) => { const product = productFromCatalog(line.slug); return sum + (product && (rule.when_categories || []).includes(product.category) ? line.quantity : 0); }, 0);
+    return units * Math.max(1, Number(rule.max_per_item || 1));
+  }
+  function addPromoUnits(rule, quantity) {
+    const product = productFromCatalog(rule.add_slug);
+    if (!product || quantity < 1 || !productAvailability(product).canOrder) return false;
+    const key = `${lineKey(product.slug, [], '')}::promo:${rule.id}`;
+    const existing = cart.find(line => line.key === key);
+    if (existing) existing.quantity = Math.min(99, existing.quantity + quantity);
+    else cart.push({ slug: product.slug, quantity: Math.min(99, quantity), selections: [], note: '', needsReview: false, promo: rule.id, key });
+    return true;
+  }
+  // Mantiene el carrito coherente: la promo solo vale mientras haya productos que la activen.
+  function normalizePromos() {
+    let changed = false;
+    cart.filter(line => line.promo).forEach(line => {
+      const rule = upsellRule(line.promo);
+      if (!rule || rule.active === false || rule.add_slug !== line.slug) { delete line.promo; line.key = lineKey(line.slug, line.selections, line.note); changed = true; }
+    });
+    const merged = [];
+    cart.forEach(line => { const same = merged.find(item => item.key === line.key); if (same) { same.quantity = Math.min(99, same.quantity + line.quantity); changed = true; } else merged.push(line); });
+    cart = merged;
+    upsellRules().forEach(rule => {
+      let excess = promoUnits(rule) - promoAllowed(rule);
+      if (excess <= 0) return;
+      changed = true;
+      for (let i = cart.length - 1; i >= 0 && excess > 0; i--) {
+        if (cart[i].promo !== rule.id) continue;
+        const cut = Math.min(excess, cart[i].quantity); cart[i].quantity -= cut; excess -= cut;
+        if (cart[i].quantity <= 0) cart.splice(i, 1);
+      }
+    });
+    return changed;
+  }
+  function upsellThumb(product) {
+    const img = safeAssetPath(product.image);
+    return img ? `<img src="${escapeHtml(img)}" alt="" width="52" height="52" loading="lazy">` : '<img src="/assets/brand/cochi-isotipo-red.png" alt="" width="34" height="36">';
+  }
+  function renderCartUpsells() {
+    const box = $('#cartUpsells');
+    if (!box) return;
+    const items = upsellRules().map(rule => ({ rule, product: productFromCatalog(rule.add_slug), remaining: promoAllowed(rule) - promoUnits(rule) }))
+      .filter(item => item.remaining > 0 && productAvailability(item.product).canOrder);
+    box.hidden = !items.length;
+    box.innerHTML = items.map(({ rule, product, remaining }) => `<div class="upsell-strip"><span class="upsell-card__img">${upsellThumb(product)}</span><div class="upsell-card__copy"><strong>${escapeHtml(rule.title)}</strong><small>${escapeHtml(product.name)} a ${currencyUSD(promoPrice(rule))}${promoSaving(rule) > 0 ? ` <s>${currencyUSD(product.price_usd)}</s> · ahorras ${currencyUSD(promoSaving(rule))} c/u` : ''}</small></div><button type="button" class="upsell-add" data-upsell-add="${escapeHtml(rule.id)}">Agregar${remaining > 1 ? ` ${remaining}` : ''}</button></div>`).join('');
+  }
+
+  /* ---------- Contenido editable desde el panel admin ---------- */
+  async function loadContent() {
+    try {
+      const controller = new AbortController();
+      const timer = window.setTimeout(() => controller.abort(), 4500);
+      const data = await fetch('/api/content', { cache: 'no-store', signal: controller.signal }).then(readJSONResponse).finally(() => window.clearTimeout(timer));
+      contentApi = data && Array.isArray(data.products) && data.products.length ? data : null;
+    } catch { contentApi = null; }
+    let fallback = {};
+    try { fallback = await fetch('/data/extras.json', { cache: 'no-store' }).then(readJSONResponse); } catch { fallback = {}; }
+    const pick = key => Array.isArray(contentApi?.[key]) ? contentApi[key] : (Array.isArray(fallback[key]) ? fallback[key] : []);
+    extras = { announcements: pick('announcements'), upsells: pick('upsells'), flyers: pick('flyers'), testimonials: pick('testimonials') };
+  }
+  function flyerLink(link) {
+    const value = String(link || '');
+    if (value.startsWith('product:')) return { type: 'product', value: value.slice(8) };
+    if (value.startsWith('https://')) return { type: 'url', value };
+    return { type: 'anchor', value };
+  }
+  function renderFlyers() {
+    const section = $('#flyers'), track = $('#flyersTrack');
+    const items = (extras.flyers || []).filter(f => f && f.active !== false && safeAssetPath(f.image));
+    section.hidden = !items.length;
+    $$('[data-flyers-nav]').forEach(link => { link.hidden = !items.length; });
+    if (!items.length) { track.innerHTML = ''; return; }
+    track.innerHTML = items.map((flyer, index) => {
+      const target = flyerLink(flyer.link);
+      const label = escapeHtml(flyer.linkLabel || 'Ver más');
+      const cta = !flyer.link ? '' : target.type === 'product'
+        ? `<button type="button" class="flyer-card__cta" data-product-slug="${escapeHtml(target.value)}">${label} <svg class="ico" aria-hidden="true"><use href="#i-arrow"/></svg></button>`
+        : `<a class="flyer-card__cta" href="${escapeHtml(target.value)}"${target.type === 'url' ? ' target="_blank" rel="noopener noreferrer"' : ''}>${label} <svg class="ico" aria-hidden="true"><use href="#i-arrow"/></svg></a>`;
+      return `<article class="flyer-card" role="listitem" style="--tilt:${index % 2 ? 1.2 : -1.2}deg"><div class="flyer-card__media"><img src="${escapeHtml(safeAssetPath(flyer.image))}" alt="${escapeHtml(flyer.title || 'Flyer de Cochi')}" width="720" height="900" loading="lazy">${flyer.badge ? `<span class="flyer-card__badge">${escapeHtml(flyer.badge)}</span>` : ''}</div><div class="flyer-card__body">${flyer.title ? `<h3>${escapeHtml(flyer.title)}</h3>` : ''}${flyer.text ? `<p>${escapeHtml(flyer.text)}</p>` : ''}${cta}</div></article>`;
+    }).join('');
+    prepReveal($$('.flyer-card', track));
+  }
+  function renderTestimonials() {
+    const section = $('#comentarios'), grid = $('#testimonialsGrid');
+    const items = (extras.testimonials || []).filter(t => t && t.active !== false && t.text);
+    section.hidden = !items.length;
+    if (!items.length) { grid.innerHTML = ''; return; }
+    grid.innerHTML = items.map(t => `<figure class="quote-card"><blockquote>${escapeHtml(t.text)}</blockquote>${t.name ? `<figcaption>${escapeHtml(t.name)}</figcaption>` : ''}</figure>`).join('');
+    prepReveal($$('.quote-card', grid));
+  }
+  function renderAnnouncements() {
+    const list = (extras.announcements || []).map(a => String(a).trim()).filter(Boolean);
+    const track = $('.announcement__track');
+    if (!list.length || !track) return;
+    const items = Array.from({ length: Math.ceil(10 / list.length) }, () => list).flat();
+    const dot = '<span class="announcement__dot"></span>';
+    const set = `<div class="announcement__set">${items.map(a => `<span>${escapeHtml(a)}</span>`).join(dot)}${dot}</div>`;
+    track.innerHTML = set + set;
+    const reader = $('.announcement .sr-only'); if (reader) reader.textContent = list.join(' · ');
   }
   function setupIntro() {
     const intro = $('#intro');
@@ -705,7 +829,7 @@
         window.setTimeout(finish, reducedMotion ? 0 : 450);
         window.setTimeout(() => intro.remove(), reducedMotion ? 5 : 1000);
       };
-      window.setTimeout(dismiss, reducedMotion ? 180 : 2500);
+      window.setTimeout(dismiss, reducedMotion ? 180 : 4900);
       intro.addEventListener('click', dismiss, { once: true });
     });
   }
@@ -814,6 +938,12 @@
       if (qtyButton) { changeCartQuantity(qtyButton.dataset.lineKey, Number(qtyButton.dataset.lineQty)); return; }
       const removeButton = event.target.closest('[data-remove-line]');
       if (removeButton) { removeCartLine(removeButton.dataset.removeLine); return; }
+      const upsellAdd = event.target.closest('[data-upsell-add]');
+      if (upsellAdd) {
+        const rule = upsellRule(upsellAdd.dataset.upsellAdd);
+        if (rule && addPromoUnits(rule, promoAllowed(rule) - promoUnits(rule))) { saveCart(); renderCart(); showToast(`${productFromCatalog(rule.add_slug).name} agregado con promo.`); }
+        return;
+      }
       const editButton = event.target.closest('[data-edit-line]');
       if (editButton) {
         const line = cart.find(item => item.key === editButton.dataset.editLine);
@@ -876,10 +1006,12 @@
     splitHeadings();
     setupEvents();
     updateScheduleNotice();
+    await loadContent();
     await loadConfig();
     await loadProducts();
     loadCart();
     renderFeatured(); renderProducts(); renderDulceFeatured(); renderCart(); renderModes();
+    renderFlyers(); renderTestimonials(); renderAnnouncements();
     $$('[data-price-of]').forEach(el => { const p = productFromCatalog(el.dataset.priceOf); if (p) el.textContent = currencyUSD(p.price_usd).replace('.00', ''); });
     updateScheduleNotice();
     await introDone;

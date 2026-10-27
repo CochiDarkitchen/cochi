@@ -27,8 +27,16 @@
     <div class="intro__grain" aria-hidden="true"></div>
     <span class="intro__ring" aria-hidden="true"></span><span class="intro__ring intro__ring--2" aria-hidden="true"></span>
     <div class="intro__mark-wrap">
-      <img class="intro__mark" src="/assets/brand/cochi-isotipo-cream.png" alt="" width="240" height="250" fetchpriority="high">
-      <span class="intro__wink" aria-hidden="true"></span>
+      <div class="intro__sun" aria-hidden="true"></div>
+      <span class="intro__ring intro__ring--wink" aria-hidden="true"></span>
+      <div class="intro__face">
+        <img class="intro__mark" src="/assets/brand/cochi-isotipo-cream.png" alt="" width="959" height="1000" fetchpriority="high">
+        <svg class="intro__wink-fx" viewBox="0 0 959 1000" aria-hidden="true" focusable="false">
+          <ellipse class="wink-lid" cx="509" cy="653" rx="36" ry="36"/>
+          <path class="wink-line" d="M464 674Q509 606 554 674"/>
+          <g transform="translate(-80 330)"><use class="spk" style="--k:0" href="#i-spark" x="-75" y="-75" width="150" height="150"/></g><g transform="translate(-50 740)"><use class="spk" style="--k:1" href="#i-spark" x="-53" y="-53" width="105" height="105"/></g><g transform="translate(1040 250)"><use class="spk" style="--k:2" href="#i-spark" x="-70" y="-70" width="140" height="140"/></g><g transform="translate(1020 660)"><use class="spk" style="--k:3" href="#i-spark" x="-50" y="-50" width="100" height="100"/></g><g transform="translate(470 -70)"><use class="spk" style="--k:4" href="#i-spark" x="-60" y="-60" width="120" height="120"/></g><g transform="translate(860 -40)"><use class="spk" style="--k:5" href="#i-spark" x="-45" y="-45" width="90" height="90"/></g>
+        </svg>
+      </div>
     </div>
     <p class="intro__word" aria-label="Cochi"><i style="--i:0">C</i><i style="--i:1">O</i><i style="--i:2">C</i><i style="--i:3">H</i><i style="--i:4">I</i><b class="reg">&reg;</b></p>
     <p class="intro__caption">EL ANTOJO TIENE NOMBRE</p>
@@ -45,7 +53,7 @@
     </a>
     <nav class="desktop-nav" aria-label="Navegación principal">
       <a href="#menu">Menú</a>
-      <a href="#favoritos">Favoritos</a>
+      <a href="#favoritos">Favoritos</a><a href="#flyers" data-flyers-nav hidden>Lo nuevo</a>
       <a href="#cochi-dulce" class="nav-dulce"><span class="nav-dulce__spark" aria-hidden="true"><svg class="ico spark" aria-hidden="true"><use href="#i-spark"/></svg></span> Cochi Dulce</a>
       <a href="#historia">La actitud Cochi</a>
     </nav>
@@ -57,7 +65,7 @@
       <button class="mobile-menu-toggle" type="button" id="mobileMenuToggle" aria-label="Abrir navegación" aria-expanded="false" aria-controls="mobileNav"><span></span><span></span></button>
     </div>
     <nav class="mobile-nav" id="mobileNav" aria-label="Navegación móvil" hidden>
-      <a href="#menu">Menú completo</a><a href="#favoritos">Favoritos</a><a href="#cochi-dulce">Cochi Dulce</a><a href="#historia">La actitud Cochi</a>
+      <a href="#menu">Menú completo</a><a href="#favoritos">Favoritos</a><a href="#flyers" data-flyers-nav hidden>Lo nuevo</a><a href="#cochi-dulce">Cochi Dulce</a><a href="#historia">La actitud Cochi</a>
       <button type="button" data-open-cart>Ver mi pedido <span data-cart-count>0</span></button>
     </nav>
   </header>
@@ -98,6 +106,16 @@
         <div class="skeleton-card"></div><div class="skeleton-card"></div><div class="skeleton-card"></div>
       </div>
       <div class="center-action reveal"><a href="#menu" class="button button--outline">Ir al menú completo <svg class="ico ico--d" aria-hidden="true"><use href="#i-arrow"/></svg></a></div>
+    </section>
+
+    <section class="flyers section-pad" id="flyers" aria-labelledby="flyers-title" hidden>
+      <div class="section-wrap">
+        <div class="section-heading reveal">
+          <div><p class="eyebrow"><span class="eyebrow__line"></span> LO NUEVO EN COCHI</p><h2 id="flyers-title">Ofertas y <em>novedades.</em></h2></div>
+          <p class="section-heading__aside">Lo que está pasando en Cochi.<br>Desliza y mira.</p>
+        </div>
+      </div>
+      <div class="flyers-track" id="flyersTrack" role="list" tabindex="0" aria-label="Flyers y novedades"></div>
     </section>
 
     <section class="menu-section section-pad" id="menu" aria-labelledby="menu-title">
@@ -145,11 +163,24 @@
       </div>
     </section>
 
+    <section class="quotes section-pad" id="comentarios" aria-labelledby="quotes-title" hidden>
+      <div class="section-wrap">
+        <div class="section-heading reveal"><div><p class="eyebrow"><span class="eyebrow__line"></span> LO QUE DICEN</p><h2 id="quotes-title">Se nota cuando <em>está bueno.</em></h2></div></div>
+        <div class="quotes-grid" id="testimonialsGrid"></div>
+      </div>
+    </section>
+
     <section class="ticker ticker--alt" aria-hidden="true"><div class="ticker__track"><div class="ticker__set"><span>SIN COMPLICACIONES</span><b><svg class="ico spark" aria-hidden="true"><use href="#i-spark"/></svg></b><span>CON ACTITUD</span><b><svg class="ico spark" aria-hidden="true"><use href="#i-spark"/></svg></b><span>CON FUEGO</span><b><svg class="ico spark" aria-hidden="true"><use href="#i-spark"/></svg></b><span>SIN COMPLICACIONES</span><b><svg class="ico spark" aria-hidden="true"><use href="#i-spark"/></svg></b><span>CON ACTITUD</span><b><svg class="ico spark" aria-hidden="true"><use href="#i-spark"/></svg></b><span>CON FUEGO</span><b><svg class="ico spark" aria-hidden="true"><use href="#i-spark"/></svg></b><span>SIN COMPLICACIONES</span><b><svg class="ico spark" aria-hidden="true"><use href="#i-spark"/></svg></b><span>CON ACTITUD</span><b><svg class="ico spark" aria-hidden="true"><use href="#i-spark"/></svg></b><span>CON FUEGO</span><b><svg class="ico spark" aria-hidden="true"><use href="#i-spark"/></svg></b></div><div class="ticker__set"><span>SIN COMPLICACIONES</span><b><svg class="ico spark" aria-hidden="true"><use href="#i-spark"/></svg></b><span>CON ACTITUD</span><b><svg class="ico spark" aria-hidden="true"><use href="#i-spark"/></svg></b><span>CON FUEGO</span><b><svg class="ico spark" aria-hidden="true"><use href="#i-spark"/></svg></b><span>SIN COMPLICACIONES</span><b><svg class="ico spark" aria-hidden="true"><use href="#i-spark"/></svg></b><span>CON ACTITUD</span><b><svg class="ico spark" aria-hidden="true"><use href="#i-spark"/></svg></b><span>CON FUEGO</span><b><svg class="ico spark" aria-hidden="true"><use href="#i-spark"/></svg></b><span>SIN COMPLICACIONES</span><b><svg class="ico spark" aria-hidden="true"><use href="#i-spark"/></svg></b><span>CON ACTITUD</span><b><svg class="ico spark" aria-hidden="true"><use href="#i-spark"/></svg></b><span>CON FUEGO</span><b><svg class="ico spark" aria-hidden="true"><use href="#i-spark"/></svg></b></div></div></section>
 
     <section class="attitude section-pad" id="historia" aria-labelledby="attitude-title">
       <div class="section-wrap attitude-layout">
-        <div class="attitude-mark reveal"><img src="/assets/brand/cochi-isotipo-red.png" alt="Isotipo de Cochi: un cerdito rodeado de llamas" width="220" height="230"><span>COCHI<br>DESDE EL<br>PRIMER BOCADO.</span></div>
+        <div class="attitude-mark reveal reveal--pop">
+          <div class="attitude-badge">
+            <svg class="attitude-badge__ring" viewBox="0 0 300 300" aria-hidden="true" focusable="false"><defs><path id="ringPath" d="M150,150m-122,0a122,122 0 1,1 244,0a122,122 0 1,1-244,0"/></defs><text><textPath href="#ringPath" textLength="766" lengthAdjust="spacing">COCHI DESDE EL PRIMER BOCADO · COCHI DESDE EL PRIMER BOCADO · </textPath></text></svg>
+            <span class="attitude-badge__core"><img src="/assets/brand/cochi-isotipo-red.png" alt="Isotipo de Cochi: un cerdito rodeado de llamas" width="220" height="230"></span>
+          </div>
+          <p class="sr-only">Cochi, desde el primer bocado.</p>
+        </div>
         <div class="attitude-copy reveal"><p class="eyebrow"><span class="eyebrow__line"></span> ESTA ES LA ACTITUD</p><h2 id="attitude-title">NO ES SOLO<br>COMER. ES <em>COCHI.</em></h2><p>Una identidad con fuego, sabores que llaman la atención y una experiencia fácil para elegir lo que te provoca. Tú decides qué va en tu pedido.</p><a href="#menu" class="text-link text-link--large">Vamos a elegir <svg class="ico" aria-hidden="true"><use href="#i-arrow"/></svg></a></div>
       </div>
     </section>
@@ -165,7 +196,7 @@
   <div class="drawer-backdrop" id="cartBackdrop" hidden></div>
   <aside class="cart-drawer" id="cartDrawer" inert aria-labelledby="cartTitle" aria-modal="true" role="dialog" aria-hidden="true" tabindex="-1">
     <div class="drawer-head"><div><p class="eyebrow"><span class="eyebrow__line"></span> TU SELECCIÓN</p><h2 id="cartTitle">Mi <em>pedido.</em></h2></div><button type="button" class="icon-button" id="closeCart" aria-label="Cerrar carrito"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div>
-    <div class="cart-view" id="cartView"><div id="cartLines" class="cart-lines"></div><div class="cart-empty" id="cartEmpty"><div class="cart-empty__icon"><img src="/assets/brand/cochi-isotipo-red.png" alt="" width="70" height="72"></div><h3>Aquí empieza<br>el antojo.</h3><p>Tu pedido todavía está vacío. Date una vuelta por el menú y vuelve cuando tengas tus favoritos.</p><button type="button" class="button button--dark" id="exploreFromCart">Explorar el menú <svg class="ico ico--d" aria-hidden="true"><use href="#i-arrow"/></svg></button></div><div class="cart-bottom" id="cartBottom"><p class="order-schedule-note" id="orderScheduleNote" role="status">Trabajamos únicamente de viernes a domingo.</p><div class="cart-subtotal-row"><span>Productos</span><strong id="cartSubtotalUsd">$0.00</strong></div><div class="cart-subtotal-row cart-subtotal-row--ves" id="cartSubtotalVesRow"><span>Estimado en Bs.</span><strong id="cartSubtotalVes">—</strong></div><p class="rate-footnote" id="cartRateNote">La conversión a bolívares aparecerá cuando haya una tasa BCV disponible.</p><div class="delivery-note"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h11v11H3zM14 10h4l3 3v4h-7z"/><circle cx="7" cy="19" r="1.5"/><circle cx="18" cy="19" r="1.5"/></svg><span>El costo de entrega se confirma con Cochi por WhatsApp.</span></div><button type="button" class="button button--red button--wide" id="startCheckout">Continuar con mis datos <svg class="ico" aria-hidden="true"><use href="#i-arrow"/></svg></button><p class="cart-privacy-note">El monto final se confirma por WhatsApp. La preparación empieza únicamente después de recibir el depósito acordado.</p></div></div>
+    <div class="cart-view" id="cartView"><div id="cartLines" class="cart-lines"></div><div id="cartUpsells" class="cart-upsells" hidden></div><div class="cart-empty" id="cartEmpty"><div class="cart-empty__icon"><img src="/assets/brand/cochi-isotipo-red.png" alt="" width="70" height="72"></div><h3>Aquí empieza<br>el antojo.</h3><p>Tu pedido todavía está vacío. Date una vuelta por el menú y vuelve cuando tengas tus favoritos.</p><button type="button" class="button button--dark" id="exploreFromCart">Explorar el menú <svg class="ico ico--d" aria-hidden="true"><use href="#i-arrow"/></svg></button></div><div class="cart-bottom" id="cartBottom"><p class="order-schedule-note" id="orderScheduleNote" role="status">Trabajamos únicamente de viernes a domingo.</p><div class="cart-subtotal-row"><span>Productos</span><strong id="cartSubtotalUsd">$0.00</strong></div><div class="cart-subtotal-row cart-subtotal-row--ves" id="cartSubtotalVesRow"><span>Estimado en Bs.</span><strong id="cartSubtotalVes">—</strong></div><p class="rate-footnote" id="cartRateNote">La conversión a bolívares aparecerá cuando haya una tasa BCV disponible.</p><div class="delivery-note"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h11v11H3zM14 10h4l3 3v4h-7z"/><circle cx="7" cy="19" r="1.5"/><circle cx="18" cy="19" r="1.5"/></svg><span>El costo de entrega se confirma con Cochi por WhatsApp.</span></div><button type="button" class="button button--red button--wide" id="startCheckout">Continuar con mis datos <svg class="ico" aria-hidden="true"><use href="#i-arrow"/></svg></button><p class="cart-privacy-note">El monto final se confirma por WhatsApp. La preparación empieza únicamente después de recibir el depósito acordado.</p></div></div>
     <div class="checkout-view" id="checkoutView" hidden>
       <button type="button" class="back-link" id="backToCart"><svg class="ico ico--back" aria-hidden="true"><use href="#i-arrow"/></svg> Volver al carrito</button><p class="eyebrow"><span class="eyebrow__line"></span> CASI ESTÁ</p><h3>¿A dónde va<br><em>este antojo?</em></h3>
       <form id="checkoutForm" novalidate>

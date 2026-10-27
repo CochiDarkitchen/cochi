@@ -1,6 +1,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const os = require('node:os');
 const { spawn } = require('node:child_process');
 
 const root = path.resolve(__dirname, '..');
@@ -58,12 +59,12 @@ async function waitForServer(url, child) {
   assert.ok(!html.includes('/admin.html') && !app.includes('supabaseUrl') && !app.includes('/api/bcv') && !app.includes('/api/config'), 'La experiencia pública no debe depender de Admin, Supabase ni APIs de tasa.');
   const htmlIds = new Set([...html.matchAll(/\bid="([^"]+)"/g)].map(match => match[1]));
   const appStaticIds = new Set([...app.matchAll(/\$\('#([A-Za-z][A-Za-z0-9_-]*)'/g)].map(match => match[1]));
-  const dynamicIds = new Set(['modalQtyMinus', 'modalQtyValue', 'modalQtyPlus', 'saveProductToCart', 'productDialogError', 'productNote']);
+  const dynamicIds = new Set(['modalQtyMinus', 'modalQtyValue', 'modalQtyPlus', 'saveProductToCart', 'productDialogError', 'productNote', 'upsellCheck']);
   assert.deepEqual([...appStaticIds].filter(id => !htmlIds.has(id) && !dynamicIds.has(id)), [], 'El frontend no debe buscar elementos inexistentes.');
   ok('Tasa manual, WhatsApp sin precios, depósito antes de preparar, horario y referencias HTML validados.');
 
   const port = 4184;
-  const child = spawn(process.execPath, ['server.js'], { cwd: root, env: { ...process.env, PORT: String(port) }, stdio: 'ignore' });
+  const child = spawn(process.execPath, ['server.js'], { cwd: root, env: { ...process.env, PORT: String(port), ADMIN_EMAIL: 'dueno@cochi.test', ADMIN_PASSWORD: 'clave-de-prueba-123', SESSION_SECRET: 'secreto-de-prueba-largo-123', COCHI_STORAGE_DIR: fs.mkdtempSync(path.join(os.tmpdir(), 'cochi-test-')) }, stdio: 'ignore' });
   try {
     await waitForServer(`http://127.0.0.1:${port}/`, child);
     for (const [route, contentType] of [
@@ -77,9 +78,48 @@ async function waitForServer(url, child) {
       if (route.includes('.json')) assert.equal(response.headers.get('cache-control'), 'no-store, max-age=0');
       await response.arrayBuffer();
     }
-    assert.equal((await fetch(`http://127.0.0.1:${port}/admin.html`)).status, 404, 'No debe existir un panel Admin público.');
-    assert.equal((await fetch(`http://127.0.0.1:${port}/api/bcv`)).status, 404, 'No debe depender de la API de tasa.');
-    ok('Servidor local: página, catálogo, ajustes e imágenes accesibles; Admin y API innecesarios eliminados.');
+    const base = `http://127.0.0.1:${port}`;
+    assert.equal((await fetch(`${base}/admin.html`)).status, 404, 'No debe existir /admin.html suelto.');
+    assert.equal((await fetch(`${base}/api/bcv`)).status, 404, 'No debe depender de la API de tasa.');
+    ok('Servidor local: página, catálogo, ajustes e imágenes accesibles.');
+
+    // ---- Panel admin y API ----
+    const json = { 'Content-Type': 'application/json' };
+    const adminPage = await fetch(`${base}/admin/`);
+    assert.equal(adminPage.status, 200); assert.equal(adminPage.headers.get('x-robots-tag'), 'noindex, nofollow');
+    assert.equal((await fetch(`${base}/data/extras.json`)).status, 200);
+    assert.deepEqual(await (await fetch(`${base}/api/content`)).json(), {}, 'Sin cambios guardados, el sitio usa los archivos de /data.');
+    assert.equal((await fetch(`${base}/api/admin/content`)).status, 401, 'El contenido de admin exige sesión.');
+    const wrong = await fetch(`${base}/api/admin/login`, { method: 'POST', headers: json, body: JSON.stringify({ email: 'dueno@cochi.test', password: 'incorrecta' }) });
+    assert.equal(wrong.status, 401);
+    const login = await fetch(`${base}/api/admin/login`, { method: 'POST', headers: json, body: JSON.stringify({ email: 'DUENO@cochi.test', password: 'clave-de-prueba-123' }) });
+    assert.equal(login.status, 200);
+    const setCookie = login.headers.get('set-cookie') || '';
+    assert.ok(/HttpOnly/.test(setCookie) && /SameSite=Strict/.test(setCookie), 'La sesión debe ser HttpOnly y SameSite=Strict.');
+    const auth = { ...json, Cookie: setCookie.split(';')[0] };
+    const extras = JSON.parse(fs.readFileSync(path.join(publicDir, 'data/extras.json'), 'utf8'));
+    const draft = { settings, products: JSON.parse(JSON.stringify(catalog)), ...extras };
+    draft.products[0].price_usd = 9.75; draft.settings.usdToVes = 901.55;
+    const put = (content, headers = auth) => fetch(`${base}/api/admin/content`, { method: 'PUT', headers, body: JSON.stringify({ content }) });
+    assert.equal((await put(draft)).status, 200, 'El admin debe poder guardar.');
+    const published = await (await fetch(`${base}/api/content`)).json();
+    assert.equal(published.products[0].price_usd, 9.75); assert.equal(published.settings.usdToVes, 901.55);
+    assert.equal(published.flyers.length, extras.flyers.length); assert.equal(published.upsells[0].price_usd, 1);
+    const negative = JSON.parse(JSON.stringify(draft)); negative.products[0].price_usd = -3;
+    assert.equal((await put(negative)).status, 400, 'No se aceptan precios negativos.');
+    const evil = JSON.parse(JSON.stringify(draft)); evil.flyers[0].link = 'javascript:alert(1)';
+    assert.equal((await put(evil)).status, 400, 'No se aceptan enlaces peligrosos.');
+    const evilImg = JSON.parse(JSON.stringify(draft)); evilImg.products[0].image = 'https://otro-sitio.com/x.png';
+    assert.equal((await put(evilImg)).status, 400, 'Las imágenes deben ser del propio sitio.');
+    assert.equal((await put(draft, { Cookie: auth.Cookie })).status, 403, 'Se exige JSON (protección contra solicitudes ajenas).');
+    assert.equal((await put(draft, { ...auth, Origin: 'https://sitio-malo.com' })).status, 403, 'Se rechazan solicitudes de otros orígenes.');
+    const webp = Buffer.concat([Buffer.from('RIFF'), Buffer.from([20, 0, 0, 0]), Buffer.from('WEBPVP8 '), Buffer.alloc(16)]);
+    const up = await fetch(`${base}/api/admin/upload`, { method: 'POST', headers: auth, body: JSON.stringify({ dataUrl: `data:image/webp;base64,${webp.toString('base64')}` }) });
+    assert.equal(up.status, 200); const { url } = await up.json(); assert.match(url, /^\/api\/img\/[\w-]+$/);
+    const served = await fetch(`${base}${url}`); assert.equal(served.status, 200); assert.equal(served.headers.get('content-type'), 'image/webp');
+    const fake = await fetch(`${base}/api/admin/upload`, { method: 'POST', headers: auth, body: JSON.stringify({ dataUrl: `data:image/webp;base64,${Buffer.from('no soy una imagen').toString('base64')}` }) });
+    assert.equal(fake.status, 400, 'Un archivo que no es imagen se rechaza.');
+    ok('Panel admin: login, sesión segura, guardado validado, protección de origen y subida de imágenes.');
   } finally {
     child.kill('SIGTERM');
   }
