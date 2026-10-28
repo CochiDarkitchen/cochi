@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#ebe0bf"><title>Administración · Cochi</title>
+  <link rel="icon" type="image/png" href="/assets/brand/favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css"><script defer src="/admin.js"></script>
+</head>
+<body class="admin-page">
+  <div class="admin-wrap">
+    <div class="admin-top"><a href="/" aria-label="Volver a Cochi"><img src="/assets/brand/cochi-logo-red.png" alt="Cochi"></a><a href="/">← Volver a la web</a></div>
+    <header class="admin-title"><p class="eyebrow"><span class="eyebrow__line"></span> GESTIÓN DEL MENÚ</p><h1>Administración<br><em style="font-style:normal;color:var(--cochi-red)">Cochi.</em></h1><p>Gestiona productos, precios, fotos y disponibilidad sin editar código. Para guardar cambios en línea debes configurar Supabase y crear una cuenta administrativa autorizada.</p></header>
+    <div id="adminGlobalNotice" class="admin-notice" role="status" hidden></div>
+
+    <section class="admin-panel admin-login" id="configPanel" hidden>
+      <h2>Primero, conecta la nube</h2><div class="admin-notice admin-notice--error">Supabase todavía no está configurado. El catálogo público funciona con los datos locales, pero la administración segura necesita el proyecto Supabase.</div>
+      <p class="admin-muted">Abre <code>.env</code> en tu entorno local o añade <code>SUPABASE_URL</code> y <code>SUPABASE_ANON_KEY</code> en las variables de entorno de Vercel. Después ejecuta <code>supabase/schema.sql</code> y <code>supabase/seed.sql</code> en el SQL Editor de Supabase y crea el usuario administrador siguiendo el README.</p>
+    </section>
+
+    <section class="admin-panel admin-login" id="loginPanel" hidden>
+      <h2>Entrar al panel</h2><p class="admin-muted">Usa una cuenta que ya exista en Supabase Auth y que esté autorizada en la tabla de administradores. No se crea ni se inventa ninguna contraseña desde esta página.</p>
+      <form id="loginForm"><div class="admin-form-grid"><label class="admin-field admin-field--full">Correo electrónico<input name="email" type="email" required autocomplete="username" placeholder="correo@cochi.com"></label><label class="admin-field admin-field--full">Contraseña<input name="password" type="password" required autocomplete="current-password" placeholder="Tu contraseña"></label></div><div class="admin-actions"><button class="button button--dark" type="submit">Iniciar sesión <span aria-hidden="true">↗</span></button></div></form>
+    </section>
+
+    <section id="managementPanel" hidden>
+      <div class="admin-panel"><div style="display:flex;align-items:center;justify-content:space-between;gap:15px;flex-wrap:wrap"><div><h2>Tu catálogo</h2><p class="admin-muted" id="adminCatalogStatus">Cargando productos…</p></div><div class="admin-actions" style="margin:0"><button type="button" class="button button--red" id="newProductButton">+ Nuevo producto</button><button type="button" class="admin-small-button" id="refreshProductsButton">Actualizar</button><button type="button" class="admin-small-button" id="logoutButton">Cerrar sesión</button></div></div>
+        <div class="admin-tabs"><button type="button" class="admin-tab is-active" data-admin-tab="products">Productos</button><button type="button" class="admin-tab" data-admin-tab="settings">Ajustes del negocio</button></div>
+        <div id="adminProductsTab"><div id="adminProductList" class="admin-products"></div><p class="admin-muted" style="margin-top:16px">Los cambios se guardan en Supabase. La web pública vuelve a consultar el catálogo remoto cuando se carga. Comprueba el menú después de guardar, especialmente los precios y la disponibilidad por día.</p></div>
+        <div id="adminSettingsTab" hidden><h2>Datos para recibir pedidos</h2><div class="admin-notice">El número que aparece en el menú original se cargó como referencia inicial. Confirma que sigue activo antes de publicar. El valor se guardará como número internacional sin + ni espacios.</div><form id="settingsForm"><div class="admin-form-grid"><label class="admin-field admin-field--full">WhatsApp internacional<input name="whatsapp_number" type="tel" inputmode="numeric" placeholder="584242246392" pattern="[0-9+() -]{10,24}" required></label><div class="admin-field admin-field--full"><div class="admin-checks"><label><input type="checkbox" name="whatsapp_number_confirmed"> Confirmo que el número pertenece a Cochi y recibe mensajes de WhatsApp</label></div><small class="admin-muted">Marca esta casilla solo después de comprobar el número en un teléfono real.</small></div><label class="admin-field">Costo de entrega en USD <small>Vacío = se confirma por WhatsApp; 0 = sin cargo configurado.</small><input name="delivery_fee_usd" type="number" min="0" step="0.01" placeholder="Por confirmar"></label><div class="admin-field"><span>Modalidades habilitadas</span><div class="admin-checks"><label><input type="checkbox" name="order_modes" value="delivery"> Entrega a domicilio</label><label><input type="checkbox" name="order_modes" value="pickup"> Retiro</label></div><small class="admin-muted">Selecciona solo las modalidades que Cochi ofrece actualmente.</small></div><div class="admin-field admin-field--full"><div class="admin-checks"><label><input type="checkbox" name="order_modes_confirmed"> Confirmo que estas modalidades, las zonas y sus condiciones están verificadas</label></div></div></div><div class="admin-actions"><button class="button button--dark" type="submit">Guardar ajustes <span aria-hidden="true">↗</span></button></div></form></div>
+      </div>
+      <div class="admin-panel" id="productEditor" hidden><h2 id="productEditorTitle">Nuevo producto</h2><form id="productForm"><input type="hidden" name="id"><div class="admin-form-grid">
+        <label class="admin-field">Nombre del producto<input name="name" required maxlength="120"></label>
+        <label class="admin-field">Categoría<input name="category" required maxlength="80" placeholder="Ej. Shawarmas"></label>
+        <label class="admin-field">Precio base en USD<input name="price_usd" type="number" min="0" step="0.01" required></label>
+        <label class="admin-field">Marca / sección<select name="brand"><option value="cochi">Cochi</option><option value="dulce">Cochi Dulce</option></select></label>
+        <label class="admin-field admin-field--full">Descripción<textarea name="description" rows="3" maxlength="650" required></textarea></label>
+        <label class="admin-field admin-field--full">Ruta o URL de la fotografía<input name="image" type="text" maxlength="600" placeholder="/assets/food/mi-foto.webp o URL https://…"></label>
+        <div class="admin-field admin-field--full"><span>Subir fotografía a Supabase Storage</span><div style="display:flex;gap:9px;align-items:center;flex-wrap:wrap"><input id="productImageFile" type="file" accept="image/png,image/jpeg,image/webp" style="max-width:100%"><button class="admin-small-button" id="uploadImageButton" type="button">Subir foto seleccionada</button></div><small class="admin-muted">Crea un bucket público llamado <code>cochi-products</code> o cambia <code>SUPABASE_STORAGE_BUCKET</code>. Recomendación: JPG/WebP optimizado, hasta 5 MB.</small></div>
+        <label class="admin-field">Orden en el menú<input name="sort_order" type="number" min="0" step="1" value="100"></label>
+        <label class="admin-field">Días de disponibilidad<select name="availability"><option value="all">Todos los días</option><option value="sunday">Solo domingos</option><option value="custom">Elegir días</option></select></label>
+        <div class="admin-field admin-field--full" id="customDaysField" hidden><span>Selecciona los días en que se ofrece</span><div class="admin-checks option-weekdays"><label><input type="checkbox" data-weekday value="1"> Lunes</label><label><input type="checkbox" data-weekday value="2"> Martes</label><label><input type="checkbox" data-weekday value="3"> Miércoles</label><label><input type="checkbox" data-weekday value="4"> Jueves</label><label><input type="checkbox" data-weekday value="5"> Viernes</label><label><input type="checkbox" data-weekday value="6"> Sábado</label><label><input type="checkbox" data-weekday value="0"> Domingo</label></div><input type="hidden" name="availability_days_json"></div>
+        <div class="admin-field admin-field--full options-editor-wrap"><span class="admin-field-label">Opciones y personalizaciones</span><p class="admin-muted">Crea grupos como “Elige la salsa” o “Acompañamiento”. Marca si son obligatorios y asigna un suplemento si corresponde. “Varias opciones” permite seleccionar más de una e indicar cantidad.</p><div id="optionsEditor" class="options-editor"></div><button class="admin-small-button" id="addOptionGroupButton" type="button">+ Añadir grupo de opciones</button><textarea name="options_json" hidden aria-hidden="true"></textarea></div>
+      </div><div class="admin-checks"><label><input name="available" type="checkbox" checked> Disponible</label><label><input name="is_visible" type="checkbox" checked> Visible en la web</label><label><input name="featured" type="checkbox"> Destacado</label><label><input name="is_coming_soon" type="checkbox"> Próximamente (sin compra)</label></div><div class="admin-actions"><button type="submit" class="button button--red">Guardar producto <span aria-hidden="true">↗</span></button><button type="button" class="admin-small-button" id="cancelProductEdit">Cancelar</button></div></form></div>
+    </section>
+  </div>
+</body>
+</html>

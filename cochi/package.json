@@ -1,0 +1,15 @@
+{
+  "name": "cochi-experiencia-gastronomica",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Experiencia web mobile-first de Cochi Dark Kitchen con catálogo, carrito y pedidos por WhatsApp.",
+  "scripts": {
+    "dev": "node server.js",
+    "start": "node server.js",
+    "check": "node --check public/app.js && node --check public/admin.js && node --check api/bcv.js && node --check server.js && node --check scripts/smoke-test.js",
+    "test": "node scripts/smoke-test.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

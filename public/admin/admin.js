@@ -7,9 +7,12 @@
 
   async function api(path, options = {}) {
     const response = await fetch(`/api/admin/${path}`, { credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, ...options });
-    const body = await response.json().catch(() => ({}));
-    if (!response.ok) throw Object.assign(new Error(body.error || 'No se pudo completar la acción.'), { status: response.status });
-    return body;
+    const body = await response.json().catch(() => null);
+    if (!response.ok) {
+      const sinDatos = `El servidor del panel no respondió como se esperaba (código ${response.status}). Abre /api/health en tu sitio: si no muestra datos, la carpeta "api" no está publicada.`;
+      throw Object.assign(new Error((body && body.error) || sinDatos), { status: response.status });
+    }
+    return body || {};
   }
   function toast(text, bad = false) {
     const node = $('#toast'); node.textContent = text; node.className = `toast is-on${bad ? ' is-bad' : ''}`;

@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#ebe0bf">
+  <meta name="description" content="Explora el menú de Cochi, arma tu pedido y envíalo por WhatsApp. Sabor con personalidad, desde Cochi Dark Kitchen hasta Cochi Dulce.">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Cochi — El antojo tiene nombre">
+  <meta property="og:description" content="Explora el menú, arma tu pedido y escríbenos por WhatsApp.">
+  <meta property="og:image" content="/assets/ui/og-cochi.jpg">
+  <meta name="twitter:card" content="summary_large_image">
+  <title>Cochi — El antojo tiene nombre</title>
+  <link rel="icon" type="image/png" href="/assets/brand/favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+  <script defer src="/app.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#menu">Saltar al menú</a>
+
+  <div class="intro" id="intro" aria-label="Bienvenido a Cochi" role="status">
+    <div class="intro__grain" aria-hidden="true"></div>
+    <div class="intro__mark-wrap">
+      <img class="intro__mark" src="/assets/brand/cochi-isotipo-cream.png" alt="" width="240" height="250" fetchpriority="high">
+      <span class="intro__wink" aria-hidden="true"></span>
+    </div>
+    <p class="intro__word">COCHI<span>®</span></p>
+    <p class="intro__caption">EL ANTOJO TIENE NOMBRE</p>
+    <div class="intro__underline" aria-hidden="true"></div>
+  </div>
+
+  <div class="announcement" aria-label="Mensaje de marca">
+    <span>EL ANTOJO TIENE NOMBRE</span><span class="announcement__dot" aria-hidden="true"></span><span>ARMA TU PEDIDO</span><span class="announcement__dot" aria-hidden="true"></span><span>COCHI, SIN COMPLICACIONES</span>
+  </div>
+
+  <header class="site-header" id="top">
+    <a class="brand-lockup" href="#top" aria-label="Cochi, inicio">
+      <img src="/assets/brand/cochi-logo-red.png" alt="Cochi" width="142" height="50">
+      <span class="brand-lockup__sub">DARK KITCHEN</span>
+    </a>
+    <nav class="desktop-nav" aria-label="Navegación principal">
+      <a href="#menu">Menú</a>
+      <a href="#favoritos">Favoritos</a>
+      <a href="#cochi-dulce" class="nav-dulce"><span class="nav-dulce__spark" aria-hidden="true">✳</span> Cochi Dulce</a>
+      <a href="#historia">La actitud Cochi</a>
+    </nav>
+    <div class="header-actions">
+      <button class="cart-trigger" type="button" data-open-cart aria-label="Abrir carrito">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2l2.1 10.3a2 2 0 0 0 2 1.6h7.6a2 2 0 0 0 1.9-1.4L21 8H6"/><circle cx="10" cy="20" r="1.1"/><circle cx="18" cy="20" r="1.1"/></svg>
+        <span class="cart-trigger__label">Mi pedido</span><span class="cart-count" data-cart-count>0</span>
+      </button>
+      <button class="mobile-menu-toggle" type="button" id="mobileMenuToggle" aria-label="Abrir navegación" aria-expanded="false" aria-controls="mobileNav"><span></span><span></span></button>
+    </div>
+    <nav class="mobile-nav" id="mobileNav" aria-label="Navegación móvil" hidden>
+      <a href="#menu">Menú completo</a><a href="#favoritos">Favoritos</a><a href="#cochi-dulce">Cochi Dulce</a><a href="#historia">La actitud Cochi</a>
+      <button type="button" data-open-cart>Ver mi pedido <span data-cart-count>0</span></button>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero section-wrap" aria-labelledby="hero-title">
+      <div class="hero__copy reveal">
+        <div class="eyebrow"><span class="eyebrow__line"></span> DARK KITCHEN · SABOR CON ACTITUD</div>
+        <h1 id="hero-title">HOY SE<br>COME <em>BRUTAL.</em></h1>
+        <p class="hero__lead">Shawarmas que se roban la escena, costillas con carácter y ese antojo que no se queda en “después veo”.</p>
+        <div class="hero__actions">
+          <a class="button button--dark" href="#menu">Explorar el menú <span aria-hidden="true">↘</span></a>
+          <a class="text-link" href="#favoritos">Ver lo que provoca <span aria-hidden="true">↗</span></a>
+        </div>
+        <div class="hero__footnote"><span class="hero__footnote-icon" aria-hidden="true">✳</span><span>Elige tus favoritos.<br>Nos escribes. Listo.</span></div>
+      </div>
+      <div class="hero-art reveal" aria-label="Fotografía promocional del Shawarma César de Cochi">
+        <div class="hero-art__circle" aria-hidden="true"></div>
+        <div class="hero-art__scribble" aria-hidden="true">ANTOJO<br>ACTIVADO</div>
+        <div class="hero-art__image-frame">
+          <img src="/assets/food/shawarma-cesar.webp" alt="Shawarma César con pollo crispy, vegetales y salsa César, fotografiado en un flyer original de Cochi" width="915" height="705" fetchpriority="high">
+        </div>
+        <div class="hero-art__stamp"><span>COCHI</span><b>FUEGO<br>Y SABOR</b><img src="/assets/brand/cochi-isotipo-cream.png" alt="" width="48" height="50"></div>
+        <div class="hero-art__product-tag"><span>DE LA CASA</span><strong>Shawarma César</strong><b>$8</b></div>
+        <span class="hero-art__asterisk" aria-hidden="true">✳</span>
+      </div>
+      <div class="hero-bottomline"><span>HECHO PARA EL ANTOJO</span><span>DESLIZA Y ENCUENTRA EL TUYO ↓</span></div>
+    </section>
+
+    <section class="ticker" aria-label="Mensaje de marca"><div class="ticker__track"><span>GRANDE EL ANTOJO</span><b>✳</b><span>GRANDE EL SABOR</span><b>✳</b><span>GRANDE COCHI</span><b>✳</b><span>GRANDE EL ANTOJO</span><b>✳</b><span>GRANDE EL SABOR</span><b>✳</b><span>GRANDE COCHI</span><b>✳</b></div></section>
+
+    <section class="featured section-wrap section-pad" id="favoritos" aria-labelledby="featured-title">
+      <div class="section-heading reveal">
+        <div><p class="eyebrow"><span class="eyebrow__line"></span> LA PRIMERA MORDIDA</p><h2 id="featured-title">Los que <em>se antojan.</em></h2></div>
+        <p class="section-heading__aside">No te quedes mirando.<br>Arma la combinación a tu manera.</p>
+      </div>
+      <div class="featured-grid" id="featuredGrid" aria-live="polite">
+        <div class="skeleton-card"></div><div class="skeleton-card"></div><div class="skeleton-card"></div>
+      </div>
+      <div class="center-action reveal"><a href="#menu" class="button button--outline">Ir al menú completo <span aria-hidden="true">↘</span></a></div>
+    </section>
+
+    <section class="menu-section section-pad" id="menu" aria-labelledby="menu-title">
+      <div class="section-wrap">
+        <div class="menu-topline reveal"><p class="eyebrow"><span class="eyebrow__line"></span> ELIGE TU JUGADA</p><span class="menu-topline__note">TODO EMPIEZA POR AQUÍ <span aria-hidden="true">↙</span></span></div>
+        <div class="menu-title-row reveal"><h2 id="menu-title">EL <em>MENÚ.</em></h2><p>Ve por tu clásico, prueba algo distinto o arma el pedido como te gusta. Aquí tienes todas las opciones del menú Cochi.</p></div>
+        <div class="menu-controls">
+          <div class="category-list" id="categoryList" role="group" aria-label="Filtrar menú por categoría"></div>
+          <label class="menu-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.6"/><path d="m16 16 4.5 4.5"/></svg><span class="sr-only">Buscar en el menú</span><input id="menuSearch" type="search" placeholder="¿Qué se te antoja?" autocomplete="off"></label>
+        </div>
+        <div class="menu-status" id="menuStatus" role="status" aria-live="polite"></div>
+        <div class="product-grid" id="productGrid"></div>
+        <div class="menu-footer-note"><img src="/assets/brand/cochi-isotipo-red.png" alt="" width="32" height="34"><p>¿Ya elegiste? Tu pedido se arma aquí y se termina de enviar desde WhatsApp.</p><button type="button" class="text-link" data-open-cart>Revisar mi pedido <span aria-hidden="true">↗</span></button></div>
+      </div>
+    </section>
+
+    <section class="dulce-section section-pad" id="cochi-dulce" aria-labelledby="dulce-title">
+      <div class="dulce-orbit dulce-orbit--one" aria-hidden="true"></div><div class="dulce-orbit dulce-orbit--two" aria-hidden="true"></div>
+      <div class="section-wrap dulce-layout">
+        <div class="dulce-art reveal">
+          <div class="dulce-art__top">UN FINAL<br><span>FELIZ.</span></div>
+          <div class="dulce-art__logo"><img src="/assets/brand/dulce-logo-chocolate.png" alt="Cochi Dulce" width="225" height="90"></div>
+          <div class="dulce-art__seal"><img src="/assets/brand/dulce-isotipo-chocolate.png" alt="" width="82" height="88"><span>ANTOJO<br>DULCE</span></div>
+          <div class="dulce-art__foot">HECHO PARA QUIEN SIEMPRE<br>DEJA ESPACIO PARA EL POSTRE.</div>
+        </div>
+        <div class="dulce-copy reveal">
+          <p class="eyebrow eyebrow--dulce"><span class="eyebrow__line"></span> UNA PAUSA MÁS DULCE</p>
+          <h2 id="dulce-title">EL POSTRE<br>NO SE <em>NEGOCIA.</em></h2>
+          <p>Conoce el lado más dulce de Cochi. La marquesa de chocolate es la invitada de hoy; y esto apenas comienza.</p>
+          <div class="dulce-product" id="dulceFeatured">
+            <div class="dulce-product__thumb"><img src="/assets/brand/dulce-isotipo-chocolate.png" alt="" width="58" height="62"></div>
+            <div class="dulce-product__text"><span>EL CLÁSICO DULCE</span><strong>Marquesa de chocolate</strong><small>Una pausa con sabor a chocolate.</small></div>
+            <button class="round-add round-add--dulce" type="button" data-add-product="marquesa-chocolate" aria-label="Elegir marquesa de chocolate">+</button>
+          </div>
+          <div class="dulce-coming"><span class="dulce-coming__spark" aria-hidden="true">✳</span><div><strong>SE VIENEN COSAS DULCES.</strong><p>Brownies y una sorpresa están en camino. Vuelve pronto para descubrir cuándo llegan al menú.</p></div><span class="coming-pill">PRÓXIMAMENTE</span></div>
+          <a class="button button--chocolate" href="#cochi-dulce">Quiero algo dulce <span aria-hidden="true">↘</span></a>
+        </div>
+      </div>
+    </section>
+
+    <section class="sunday-section section-pad" aria-labelledby="sunday-title">
+      <div class="section-wrap sunday-layout">
+        <div class="sunday-copy reveal"><p class="eyebrow eyebrow--light"><span class="eyebrow__line"></span> DOMINGOS CON SABOR</p><h2 id="sunday-title">EL DOMINGO<br>TIENE <em>PLAN.</em></h2><p>El pollo asado de Cochi está indicado para los domingos. Revisa su disponibilidad en el menú antes de sumarlo al pedido.</p><a class="button button--cream" href="#menu" data-filter-category="Pollo asado">Ver pollo asado <span aria-hidden="true">↗</span></a></div>
+        <div class="sunday-image reveal"><div class="sunday-image__shape" aria-hidden="true"></div><img src="/assets/food/pollo-asado.webp" alt="Pollo asado presentado en la fotografía promocional original de Cochi, acompañado de yuca, papas y ensalada" width="835" height="715" loading="lazy"><span class="sunday-image__label">SOLO LOS<br>DOMINGOS <b>✳</b></span></div>
+      </div>
+    </section>
+
+    <section class="attitude section-pad" id="historia" aria-labelledby="attitude-title">
+      <div class="section-wrap attitude-layout">
+        <div class="attitude-mark reveal"><img src="/assets/brand/cochi-isotipo-red.png" alt="Isotipo de Cochi: un cerdito rodeado de llamas" width="220" height="230"><span>COCHI<br>DESDE EL<br>PRIMER BOCADO.</span></div>
+        <div class="attitude-copy reveal"><p class="eyebrow"><span class="eyebrow__line"></span> ESTA ES LA ACTITUD</p><h2 id="attitude-title">NO ES SOLO<br>COMER. ES <em>COCHI.</em></h2><p>Una identidad con fuego, sabores que llaman la atención y una experiencia fácil para elegir lo que te provoca. Tú decides qué va en tu pedido.</p><a href="#menu" class="text-link text-link--large">Vamos a elegir <span aria-hidden="true">↗</span></a></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="section-wrap footer-main"><div class="footer-brand"><img src="/assets/brand/cochi-logo-cream.png" alt="Cochi" width="165" height="58"><p>El antojo tiene nombre.</p></div><div class="footer-nav"><span>LA SIGUIENTE JUGADA</span><a href="#menu">Ver menú</a><a href="#cochi-dulce">Cochi Dulce</a><button type="button" data-open-cart>Mi pedido</button></div><div class="footer-cta"><p>¿Listo para pedir<br><em>algo brutal?</em></p><a class="button button--cream" href="#menu">Arma tu pedido <span aria-hidden="true">↗</span></a></div></div>
+    <div class="section-wrap footer-bottom"><span>© <span id="currentYear"></span> COCHI · DARK KITCHEN</span><span>HECHO CON ANTOJO <b aria-hidden="true">✳</b></span><a href="/admin.html">Administración</a></div>
+  </footer>
+
+  <div class="mobile-order-bar" id="mobileOrderBar"><button type="button" data-open-cart><span class="mobile-order-bar__icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2l2.1 10.3a2 2 0 0 0 2 1.6h7.6a2 2 0 0 0 1.9-1.4L21 8H6"/><circle cx="10" cy="20" r="1.1"/><circle cx="18" cy="20" r="1.1"/></svg></span><span><strong>Mi pedido</strong><small data-mobile-total>$0.00</small></span><b data-cart-count>0</b><span class="mobile-order-bar__arrow">↗</span></button></div>
+
+  <div class="drawer-backdrop" id="cartBackdrop" hidden></div>
+  <aside class="cart-drawer" id="cartDrawer" aria-labelledby="cartTitle" aria-modal="true" role="dialog" aria-hidden="true" tabindex="-1">
+    <div class="drawer-head"><div><p class="eyebrow"><span class="eyebrow__line"></span> TU SELECCIÓN</p><h2 id="cartTitle">Mi <em>pedido.</em></h2></div><button type="button" class="icon-button" id="closeCart" aria-label="Cerrar carrito"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div>
+    <div class="cart-view" id="cartView"><div id="cartLines" class="cart-lines"></div><div class="cart-empty" id="cartEmpty"><div class="cart-empty__icon"><img src="/assets/brand/cochi-isotipo-red.png" alt="" width="70" height="72"></div><h3>Aquí empieza<br>el antojo.</h3><p>Tu pedido todavía está vacío. Date una vuelta por el menú y vuelve cuando tengas tus favoritos.</p><button type="button" class="button button--dark" id="exploreFromCart">Explorar el menú <span aria-hidden="true">↘</span></button></div><div class="cart-bottom" id="cartBottom"><div class="cart-subtotal-row"><span>Productos</span><strong id="cartSubtotalUsd">$0.00</strong></div><div class="cart-subtotal-row cart-subtotal-row--ves" id="cartSubtotalVesRow"><span>Estimado en Bs.</span><strong id="cartSubtotalVes">—</strong></div><p class="rate-footnote" id="cartRateNote">La conversión a bolívares aparecerá cuando haya una tasa BCV disponible.</p><div class="delivery-note"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h11v11H3zM14 10h4l3 3v4h-7z"/><circle cx="7" cy="19" r="1.5"/><circle cx="18" cy="19" r="1.5"/></svg><span>El costo de entrega se confirma con Cochi por WhatsApp, salvo que la administración configure una tarifa.</span></div><button type="button" class="button button--red button--wide" id="startCheckout">Continuar con mis datos <span aria-hidden="true">↗</span></button><p class="cart-privacy-note">Tu pedido no se envía automáticamente: lo revisarás y lo enviarás dentro de WhatsApp.</p></div></div>
+    <div class="checkout-view" id="checkoutView" hidden>
+      <button type="button" class="back-link" id="backToCart">← Volver al carrito</button><p class="eyebrow"><span class="eyebrow__line"></span> CASI ESTÁ</p><h3>¿A dónde va<br><em>este antojo?</em></h3>
+      <form id="checkoutForm" novalidate>
+        <label class="field"><span>Nombre y apellido <b>*</b></span><input name="customerName" autocomplete="name" required maxlength="100" placeholder="Cómo te llamas"></label>
+        <label class="field"><span>Teléfono de contacto <small>(recomendado)</small></span><input name="customerPhone" type="tel" autocomplete="tel" maxlength="30" placeholder="Tu número de contacto"></label>
+        <fieldset class="mode-field"><legend>¿Cómo recibes tu pedido? <b>*</b></legend><div class="mode-options" id="modeOptions"></div></fieldset>
+        <div id="deliveryFields"><label class="field"><span>Dirección de entrega <b>*</b></span><input name="address" autocomplete="street-address" maxlength="220" placeholder="Calle, casa, edificio..."></label><label class="field"><span>Sector / urbanización <b>*</b></span><input name="sector" maxlength="120" placeholder="Tu zona"></label><label class="field"><span>Referencia para llegar</span><input name="reference" maxlength="180" placeholder="Punto de referencia, color de casa..."></label></div>
+        <label class="field"><span>Notas del pedido <small>(opcional)</small></span><textarea name="orderNotes" rows="3" maxlength="500" placeholder="Algo más que Cochi deba saber"></textarea></label>
+        <div class="checkout-summary" id="checkoutSummary"></div>
+        <div class="checkout-warning" id="whatsappConfigNote" hidden></div>
+        <p class="form-error" id="checkoutError" role="alert" hidden></p>
+        <button class="button button--green button--wide" type="submit"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.2 11.6a8.3 8.3 0 0 1-12.3 7.3L3 20l1.1-4.7A8.3 8.3 0 1 1 20.2 11.6Z"/><path d="M8.2 7.8c.3-.6.6-.6.9-.6h.5c.2 0 .4.1.5.4l.7 1.7c.1.2.1.4 0 .6l-.5.7c-.2.2-.2.4 0 .6.4.7 1.1 1.3 1.8 1.7.3.2.5.2.7 0l.7-.8c.2-.2.4-.2.7-.1l1.6.8c.3.1.4.3.4.5 0 .4-.2 1.1-.7 1.5-.6.5-1.3.7-2.1.5-1-.2-2.3-.8-3.5-2-1.4-1.3-2.3-2.8-2.5-3.8-.2-.7 0-1.4.4-1.9Z"/></svg> Preparar pedido en WhatsApp <span aria-hidden="true">↗</span></button>
+        <p class="checkout-disclaimer">WhatsApp se abrirá con el mensaje preparado. Revisa los datos y pulsa enviar allí para completar la solicitud.</p>
+      </form>
+    </div>
+  </aside>
+
+  <dialog class="product-dialog" id="productDialog" aria-labelledby="productDialogTitle">
+    <form method="dialog" class="dialog-close-form"><button class="icon-button" aria-label="Cerrar producto"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></form>
+    <div id="productDialogContent"></div>
+  </dialog>
+  <div id="toastRegion" class="toast-region" aria-live="polite" aria-atomic="true"></div>
+  <noscript><div class="noscript-message">Para consultar el menú completo y armar pedidos, activa JavaScript en tu navegador.</div></noscript>
+</body>
+</html>
