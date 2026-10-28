@@ -4,9 +4,9 @@
   "private": true,
   "description": "Carta digital visual para Cochi con pedidos por WhatsApp, ofertas al pedir, flyers y panel de administración.",
   "scripts": {
-    "dev": "node server.js",
-    "start": "node server.js",
-    "check": "node --check public/app.js && node --check public/admin/admin.js && node --check server.js && node --check lib/api.js && node --check lib/store.js && node --check public/sw.js && node --check scripts/set-site-url.js && node --check scripts/smoke-test.js",
+    "dev": "node scripts/dev-server.js",
+    "start": "node scripts/dev-server.js",
+    "check": "node --check public/app.js && node --check public/admin/admin.js && node --check scripts/dev-server.js && node --check lib/api.js && node --check lib/store.js && node --check \"api/[...path].js\" && node --check public/sw.js && node --check scripts/set-site-url.js && node --check scripts/smoke-test.js",
     "test": "node scripts/smoke-test.js",
     "build": "node scripts/set-site-url.js"
   },

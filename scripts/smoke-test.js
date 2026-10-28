@@ -64,7 +64,7 @@ async function waitForServer(url, child) {
   ok('Tasa manual, WhatsApp sin precios, depósito antes de preparar, horario y referencias HTML validados.');
 
   const port = 4184;
-  const child = spawn(process.execPath, ['server.js'], { cwd: root, env: { ...process.env, PORT: String(port), ADMIN_EMAIL: 'dueno@cochi.test', ADMIN_PASSWORD: 'clave-de-prueba-123', SESSION_SECRET: 'secreto-de-prueba-largo-123', COCHI_STORAGE_DIR: fs.mkdtempSync(path.join(os.tmpdir(), 'cochi-test-')) }, stdio: 'ignore' });
+  const child = spawn(process.execPath, ['scripts/dev-server.js'], { cwd: root, env: { ...process.env, PORT: String(port), ADMIN_EMAIL: 'dueno@cochi.test', ADMIN_PASSWORD: 'clave-de-prueba-123', SESSION_SECRET: 'secreto-de-prueba-largo-123', COCHI_STORAGE_DIR: fs.mkdtempSync(path.join(os.tmpdir(), 'cochi-test-')) }, stdio: 'ignore' });
   try {
     await waitForServer(`http://127.0.0.1:${port}/`, child);
     for (const [route, contentType] of [
@@ -81,6 +81,8 @@ async function waitForServer(url, child) {
     const base = `http://127.0.0.1:${port}`;
     assert.equal((await fetch(`${base}/admin.html`)).status, 404, 'No debe existir /admin.html suelto.');
     assert.equal((await fetch(`${base}/api/bcv`)).status, 404, 'No debe depender de la API de tasa.');
+    const health = await (await fetch(`${base}/api/health`)).json();
+    assert.equal(health.ok, true); assert.equal(health.adminConfigured, true); assert.ok(!JSON.stringify(health).includes('clave-de-prueba'), 'El diagnóstico no debe revelar secretos.');
     ok('Servidor local: página, catálogo, ajustes e imágenes accesibles.');
 
     // ---- Panel admin y API ----
