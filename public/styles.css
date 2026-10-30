@@ -371,3 +371,26 @@ legend b,label b,fieldset b{color:var(--red-ink)}
 .order-ticket__status,.order-ticket__hint{margin:0;color:var(--muted,#70695d);font-size:12.5px;line-height:1.5}
 .order-ticket__image{display:block;width:min(100%,430px);max-height:560px;object-fit:contain;margin:0 auto;border:1px solid rgba(33,30,26,.12);border-radius:12px;background:#fffdf7;box-shadow:0 12px 32px rgba(33,30,26,.10)}
 .order-ticket__hint{text-align:center}
+
+
+/* ---------- Carrito: más protagonismo para productos y promociones ---------- */
+.cart-lines{padding:3px 0 8px}
+.cart-line{padding:14px 0;gap:12px}
+.cart-line__name{font-size:14px;line-height:1.35}
+.cart-line__details{font-size:11px;line-height:1.5;margin-top:4px}
+.cart-line__actions{margin-top:7px}
+.cart-bottom{padding-top:11px}
+.order-schedule-note{margin:0 0 8px;padding:6px 9px;border-radius:8px;background:rgba(235,20,12,.07);color:#7c3029;font-size:10px;font-weight:700;line-height:1.35;letter-spacing:.01em}
+.order-schedule-note.is-closed{background:rgba(33,30,26,.055);color:#655d50}
+.cart-subtotal-row{font-size:12.5px;margin-bottom:4px}
+.cart-subtotal-row strong{font-size:14px}
+.cart-subtotal-row--ves{font-size:11px}
+.cart-subtotal-row--ves strong{font-size:12px}
+.rate-footnote{font-size:9.5px;line-height:1.4;margin:4px 0 7px}
+.delivery-note{align-items:center;gap:7px;padding:8px 9px;margin:7px 0 9px;border-radius:9px;font-size:10px;line-height:1.4}
+.delivery-note svg{width:16px;height:16px}
+.cart-privacy-note{font-size:9.5px;line-height:1.4;margin-top:7px}
+.cart-upsells{gap:8px;margin-top:9px}
+.upsell-strip{gap:9px;padding:9px 10px;border-radius:14px}
+.upsell-add{min-height:38px;padding-inline:13px;font-size:11.5px}
+@media(max-width:760px){.cart-bottom{padding-top:9px}.order-schedule-note{font-size:9.5px;margin-bottom:6px}.delivery-note{margin:6px 0 8px}.cart-line{padding:12px 0}.cart-upsells{margin-top:7px}.upsell-strip{padding:8px;gap:7px}}

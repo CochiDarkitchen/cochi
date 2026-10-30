@@ -5,6 +5,7 @@
   const TABS = [['tasa', 'Tasa y datos'], ['ticket', 'Ticket WhatsApp'], ['productos', 'Productos'], ['flyers', 'Flyers'], ['comentarios', 'Comentarios'], ['ofertas', 'Ofertas y avisos']];
   let data = null, tab = 'tasa', dirty = false, openSlug = null, query = '', storage = 'file', fromDefaults = false, toastTimer = null;
   const defaultReceipt = { businessName: 'COCHI', title: 'COMPROBANTE DE PEDIDO', subtitle: 'Tu pedido está listo para confirmar', customerHeading: 'DATOS DEL CLIENTE', orderHeading: 'DETALLE DEL PEDIDO', summaryHeading: 'RESUMEN', subtotalLabel: 'Subtotal', deliveryLabel: 'Delivery', totalLabel: 'Total estimado', vesLabel: 'Total referencial en bolívares', footerText: 'El monto final y el costo de entrega se confirman directamente por WhatsApp.', thankYouText: '¡Gracias por elegir Cochi!', accentColor: '#eb140c', showLogo: true, showDate: true, showOrderCode: true, showPhone: true, showMode: true, showAddress: true, showSector: true, showReference: true, showOrderNotes: true, showItemOptions: true, showBs: true };
+  const defaultWhatsAppMessageTemplate = "¡Hola, Cochi! Quiero consultar y coordinar este pedido.\n\n*DATOS DEL CLIENTE*\nNombre: {{NOMBRE}}\n{{TELEFONO_BLOQUE}}\nModalidad: {{MODALIDAD}}\n{{DIRECCION_BLOQUE}}\n\n*MI PEDIDO*\n{{PEDIDO}}\n\n{{NOTAS_BLOQUE}}\n\n*CONFIRMACIÓN Y PAGO*\nEl monto final, la disponibilidad, el costo de entrega y los datos de pago se confirman directamente por este chat.\nLa preparación del pedido comienza únicamente después de que Cochi reciba el depósito acordado.\n\nCochi recibe pedidos únicamente de viernes a domingo.\nCódigo: {{CODIGO_PEDIDO}}\n¡Gracias!";
 
   async function api(path, options = {}) {
     const response = await fetch(`/api/admin/${path}`, { credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, ...options });
@@ -55,6 +56,8 @@
     },
     ticket() {
       const r = data.settings.receipt;
+      const ticketEnabled = data.settings.digitalTicketEnabled !== false;
+      const messageTemplate = data.settings.whatsappMessageTemplate || defaultWhatsAppMessageTemplate;
       const toggles = [
         ['showLogo', 'Mostrar el logotipo'], ['showDate', 'Mostrar fecha y hora'], ['showOrderCode', 'Mostrar número de pedido'],
         ['showPhone', 'Mostrar teléfono del cliente'], ['showMode', 'Mostrar modalidad (delivery / retiro)'],
@@ -62,7 +65,13 @@
         ['showReference', 'Mostrar referencia para llegar'], ['showOrderNotes', 'Mostrar notas adicionales'],
         ['showItemOptions', 'Mostrar opciones y observaciones de los productos'], ['showBs', 'Mostrar conversión estimada a bolívares']
       ];
-      return `<section class="card"><h2>Personaliza el ticket del pedido</h2><p class="card__intro">Esta es la imagen que acompañará el pedido cuando el cliente lo comparta. Puedes cambiar los textos, el color principal y los datos que aparecen. Los precios se calculan automáticamente según el carrito y la tasa configurada.</p>
+      return `<section class="card"><h2>Envío del pedido por WhatsApp</h2><p class="card__intro">Elige cómo quieres que el cliente envíe su pedido. Puedes compartir un ticket digital en imagen o desactivarlo para que el botón abra WhatsApp directamente con el mensaje de texto preparado.</p>
+        <label class="sw"><input type="checkbox" data-b="settings.digitalTicketEnabled" data-after="ticketMode" ${ticketEnabled ? 'checked' : ''}><span></span>Activar ticket digital (imagen)</label>
+        <p class="preview" id="ticketModeStatus">${ticketEnabled ? 'Activo: el cliente verá el ticket y podrá compartirlo junto con el mensaje.' : 'Desactivado: no se generará ni descargará una imagen; el botón abrirá WhatsApp con el texto listo para enviar.'}</p>
+        <label class="field">Mensaje de WhatsApp completamente editable<textarea data-b="settings.whatsappMessageTemplate" maxlength="5000" rows="16" spellcheck="true">${esc(messageTemplate)}</textarea><small>Puedes cambiar libremente el texto, los saltos de línea y el orden. Conserva los códigos entre llaves dobles para insertar los datos automáticamente.</small></label>
+        <div class="preview"><strong>Campos automáticos disponibles</strong><br>{{NOMBRE}} · {{TELEFONO}} · {{TELEFONO_BLOQUE}} · {{MODALIDAD}} · {{DIRECCION}} · {{SECTOR}} · {{REFERENCIA}} · {{DIRECCION_BLOQUE}} · {{PEDIDO}} · {{NOTAS}} · {{NOTAS_BLOQUE}} · {{CODIGO_PEDIDO}}<br><small>{{PEDIDO}} inserta todos los productos, cantidades, promociones, opciones y observaciones. Los bloques de teléfono, dirección y notas se ocultan cuando no aplican.</small></div>
+      </section>
+      <section class="card"><h2>Personaliza el ticket del pedido</h2><p class="card__intro">Esta es la imagen que acompañará el pedido cuando el ticket digital esté activado. Puedes cambiar los textos, el color principal y los datos que aparecen. Los precios se calculan automáticamente según el carrito y la tasa configurada.</p>
         <div class="row2">${field('Nombre del negocio', 'settings.receipt.businessName', r.businessName, 'maxlength="60" data-after="ticketPreview"')}${field('Color principal', 'settings.receipt.accentColor', r.accentColor, 'type="color" data-after="ticketPreview"')}</div>
         ${field('Título del ticket', 'settings.receipt.title', r.title, 'maxlength="70" data-after="ticketPreview"')}
         <label class="field">Texto debajo del título<textarea data-b="settings.receipt.subtitle" data-after="ticketPreview" maxlength="140" rows="2">${esc(r.subtitle)}</textarea></label>
@@ -219,7 +228,8 @@
   const AFTER = {
     bs() { document.querySelectorAll('[data-bs]').forEach(n => { n.textContent = `Bs. ${bs(data.products[n.dataset.bs].price_usd)}`; }); const p = $('#ratePreview'); const s = data.products.find(x => x.slug === 'shawarma-cesar') || data.products[0]; if (p && s) p.textContent = `${s.name}: $${money(s.price_usd)} = Bs. ${bs(s.price_usd)}`; },
     rerender() { render(); },
-    ticketPreview() { const node = $('#ticketAdminPreview'); if (node) node.innerHTML = adminTicketPreview(); }
+    ticketPreview() { const node = $('#ticketAdminPreview'); if (node) node.innerHTML = adminTicketPreview(); },
+    ticketMode() { const node = $('#ticketModeStatus'); if (node) node.textContent = data.settings.digitalTicketEnabled !== false ? 'Activo: el cliente verá el ticket y podrá compartirlo junto con el mensaje.' : 'Desactivado: no se generará ni descargará una imagen; el botón abrirá WhatsApp con el texto listo para enviar.'; }
   };
   const CHANGES = {
     flyerLink(el) { const f = data.flyers[el.dataset.i]; f.link = el.value === '__url' ? 'https://' : el.value; if (!el.value) f.linkLabel = ''; markDirty(); render(); },
@@ -274,6 +284,8 @@
     }
     ['products', 'flyers', 'testimonials', 'upsells', 'announcements'].forEach(k => { if (!Array.isArray(data[k])) data[k] = []; });
     data.settings.receipt = { ...defaultReceipt, ...(data.settings.receipt || {}) };
+    data.settings.digitalTicketEnabled = data.settings.digitalTicketEnabled !== false;
+    data.settings.whatsappMessageTemplate = data.settings.whatsappMessageTemplate || defaultWhatsAppMessageTemplate;
     $('#login').hidden = true; $('#app').hidden = false; markDirty(false); render();
   }
   $('#loginForm').addEventListener('submit', async event => {

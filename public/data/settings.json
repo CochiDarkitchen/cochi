@@ -33,5 +33,7 @@
     "showOrderNotes": true,
     "showItemOptions": true,
     "showBs": true
-  }
+  },
+  "digitalTicketEnabled": true,
+  "whatsappMessageTemplate": "¡Hola, Cochi! Quiero consultar y coordinar este pedido.\n\n*DATOS DEL CLIENTE*\nNombre: {{NOMBRE}}\n{{TELEFONO_BLOQUE}}\nModalidad: {{MODALIDAD}}\n{{DIRECCION_BLOQUE}}\n\n*MI PEDIDO*\n{{PEDIDO}}\n\n{{NOTAS_BLOQUE}}\n\n*CONFIRMACIÓN Y PAGO*\nEl monto final, la disponibilidad, el costo de entrega y los datos de pago se confirman directamente por este chat.\nLa preparación del pedido comienza únicamente después de que Cochi reciba el depósito acordado.\n\nCochi recibe pedidos únicamente de viernes a domingo.\nCódigo: {{CODIGO_PEDIDO}}\n¡Gracias!"
 }

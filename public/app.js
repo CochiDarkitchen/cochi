@@ -17,6 +17,7 @@
     showAddress: true, showSector: true, showReference: true, showOrderNotes: true,
     showItemOptions: true, showBs: true
   };
+  const defaultWhatsAppMessageTemplate = "¡Hola, Cochi! Quiero consultar y coordinar este pedido.\n\n*DATOS DEL CLIENTE*\nNombre: {{NOMBRE}}\n{{TELEFONO_BLOQUE}}\nModalidad: {{MODALIDAD}}\n{{DIRECCION_BLOQUE}}\n\n*MI PEDIDO*\n{{PEDIDO}}\n\n{{NOTAS_BLOQUE}}\n\n*CONFIRMACIÓN Y PAGO*\nEl monto final, la disponibilidad, el costo de entrega y los datos de pago se confirman directamente por este chat.\nLa preparación del pedido comienza únicamente después de que Cochi reciba el depósito acordado.\n\nCochi recibe pedidos únicamente de viernes a domingo.\nCódigo: {{CODIGO_PEDIDO}}\n¡Gracias!";
   const defaultConfig = {
     whatsappNumber: '584242246392',
     orderModes: ['delivery', 'pickup'],
@@ -24,6 +25,8 @@
     usdToVes: 887.302,
     exchangeRateDate: '2026-10-27',
     exchangeRateName: 'Tasa BCV actualizada por Cochi',
+    digitalTicketEnabled: true,
+    whatsappMessageTemplate: defaultWhatsAppMessageTemplate,
     receipt: defaultReceipt
   };
 
@@ -79,12 +82,12 @@
     return ['Fri', 'Sat', 'Sun'].includes(weekday);
   }
   function orderScheduleMessage() {
-    return 'Cochi recibe pedidos únicamente de viernes a domingo. Puedes explorar el menú y preparar tu selección; vuelve durante esos días para enviarla por WhatsApp.';
+    return 'Pedidos disponibles de viernes a domingo.';
   }
   function updateScheduleNotice() {
     const note = $('#orderScheduleNote');
     if (note) {
-      note.textContent = isOrderDay() ? '¡Estamos en días de pedidos! Trabajamos de viernes a domingo.' : orderScheduleMessage();
+      note.textContent = isOrderDay() ? '¡Pedidos abiertos! Viernes a domingo.' : orderScheduleMessage();
       note.classList.toggle('is-closed', !isOrderDay());
     }
     const button = $('#startCheckout');
@@ -635,30 +638,40 @@
     const reference = String(data.get('reference') || '').trim();
     const orderNotes = String(data.get('orderNotes') || '').trim();
     const modeLabel = mode === 'delivery' ? 'Entrega a domicilio' : mode === 'pickup' ? 'Retiro' : mode;
-    const rows = ['¡Hola, Cochi! Quiero consultar y coordinar este pedido.', '', '*DATOS DEL CLIENTE*', `Nombre: ${fullName}`];
-    if (phone) rows.push(`Teléfono: ${phone}`);
-    rows.push(`Modalidad: ${modeLabel}`);
-    if (mode === 'delivery') {
-      if (address) rows.push(`Dirección: ${address}`);
-      if (sector) rows.push(`Sector / urbanización: ${sector}`);
-      if (reference) rows.push(`Referencia: ${reference}`);
-    }
-    rows.push('', '*MI PEDIDO*');
+    const orderLines = [];
     cart.forEach((line, index) => {
       const product = productFromCatalog(line.slug);
       if (!product) return;
-      rows.push(`${index + 1}. ${product.name}`);
-      rows.push(`   Cantidad: ${line.quantity}`);
-      if (line.promo) { const promoRule = upsellRule(line.promo); if (promoRule) rows.push(`   Promo: ${promoRule.title}`); }
+      orderLines.push(`${index + 1}. ${product.name} — Cantidad: ${line.quantity}`);
+      if (line.promo) { const promoRule = upsellRule(line.promo); if (promoRule) orderLines.push(`   Promoción: ${promoRule.title}`); }
       const options = line.selections.map(selection => `${selection.groupName}: ${selection.choiceLabel}${selection.quantity > 1 ? ` x${selection.quantity}` : ''}`);
-      if (options.length) rows.push(`   Opciones: ${options.join('; ')}`);
-      if (line.note.trim()) rows.push(`   Observaciones: ${line.note.trim()}`);
-      rows.push('');
+      if (options.length) orderLines.push(`   Opciones: ${options.join('; ')}`);
+      if (line.note.trim()) orderLines.push(`   Observaciones: ${line.note.trim()}`);
     });
-    rows.push('*CONFIRMACIÓN Y PAGO*', 'El monto final, la disponibilidad, el costo de entrega y los datos de pago se confirman directamente por este chat.', 'La preparación del pedido comienza únicamente después de que Cochi reciba el depósito acordado.');
-    if (orderNotes) rows.push('', '*NOTAS ADICIONALES*', orderNotes);
-    rows.push('', 'Cochi recibe pedidos únicamente de viernes a domingo.', '¡Gracias!');
-    return rows.join('\n');
+    const addressParts = [];
+    if (mode === 'delivery' && address) addressParts.push(`Dirección: ${address}`);
+    if (mode === 'delivery' && sector) addressParts.push(`Sector / urbanización: ${sector}`);
+    if (mode === 'delivery' && reference) addressParts.push(`Referencia: ${reference}`);
+    const phoneBlock = phone ? `Teléfono: ${phone}` : '';
+    const addressBlock = addressParts.join('\n');
+    const notesBlock = orderNotes ? `*NOTAS ADICIONALES*\n${orderNotes}` : '';
+    const orderCode = pendingOrder?.code || '';
+    const values = {
+      NOMBRE: fullName,
+      TELEFONO: phone,
+      TELEFONO_BLOQUE: phoneBlock,
+      MODALIDAD: modeLabel,
+      DIRECCION: mode === 'delivery' ? address : '',
+      SECTOR: mode === 'delivery' ? sector : '',
+      REFERENCIA: mode === 'delivery' ? reference : '',
+      DIRECCION_BLOQUE: addressBlock,
+      PEDIDO: orderLines.join('\n'),
+      NOTAS: orderNotes,
+      NOTAS_BLOQUE: notesBlock,
+      CODIGO_PEDIDO: orderCode
+    };
+    const template = String(config.whatsappMessageTemplate || defaultWhatsAppMessageTemplate);
+    return template.replace(/\{\{([A-Z0-9_]+)\}\}/g, (token, key) => Object.prototype.hasOwnProperty.call(values, key) ? values[key] : token).trim();
   }
   function handleCheckoutSubmit(event) {
     event.preventDefault();
@@ -677,7 +690,7 @@
     if (pendingOrder?.ticketObjectUrl) URL.revokeObjectURL(pendingOrder.ticketObjectUrl);
     const stamp = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Caracas', year: '2-digit', month: '2-digit', day: '2-digit' }).format(new Date()).replace(/\D/g, '');
     const suffix = Math.random().toString(36).slice(2, 6).toUpperCase();
-    pendingOrder = { data: validation.data, number, code: `CO-${stamp}-${suffix}`, ticketBlob: null, ticketObjectUrl: null };
+    pendingOrder = { data: validation.data, number, code: `CO-${stamp}-${suffix}`, ticketEnabled: config.digitalTicketEnabled !== false, ticketBlob: null, ticketObjectUrl: null };
     showConfirm();
   }
   function showConfirm() {
@@ -868,6 +881,13 @@
   }
   function renderConfirm() {
     const data = pendingOrder.data, mode = String(data.get('orderMode') || getSelectedMode());
+    const ticketEnabled = pendingOrder.ticketEnabled !== false;
+    $('#orderTicketCard').hidden = !ticketEnabled;
+    $('#confirmSendLabel').textContent = ticketEnabled ? 'Compartir ticket + pedido' : 'Enviar pedido por WhatsApp';
+    $('#confirmSend').disabled = false;
+    $('#confirmStepsList').innerHTML = ticketEnabled
+      ? '<li>Comparte el ticket y el detalle de tu pedido con Cochi por WhatsApp.</li><li>Cochi confirma disponibilidad, monto final y costo de entrega.</li><li>Envías el depósito acordado y empezamos a preparar tu pedido.</li>'
+      : '<li>Envía el detalle de tu pedido a Cochi por WhatsApp.</li><li>Cochi confirma disponibilidad, monto final y costo de entrega.</li><li>Envías el depósito acordado y empezamos a preparar tu pedido.</li>';
     $('#confirmLines').innerHTML = cart.map(line => {
       const product = productFromCatalog(line.slug); if (!product) return '';
       const extra = [...line.selections.map(s => `${escapeHtml(s.groupName)}: ${escapeHtml(s.choiceLabel)}${s.quantity > 1 ? ` x${s.quantity}` : ''}`), line.note ? `Nota: ${escapeHtml(line.note)}` : ''].filter(Boolean).join(' · ');
@@ -880,7 +900,15 @@
     const pay = String(config.paymentInfo || '').trim();
     $('#confirmPay').hidden = !pay; $('#confirmPayText').textContent = pay;
     $('#orderTicketImage').hidden = true;
-    prepareOrderTicketPreview();
+    $('#downloadTicket').disabled = true;
+    if (ticketEnabled) {
+      $('#orderTicketStatus').textContent = 'Preparando la imagen del ticket…';
+      prepareOrderTicketPreview();
+    } else {
+      if (pendingOrder.ticketObjectUrl) URL.revokeObjectURL(pendingOrder.ticketObjectUrl);
+      pendingOrder.ticketBlob = null;
+      pendingOrder.ticketObjectUrl = null;
+    }
   }
   function downloadOrderTicket() {
     if (!pendingOrder?.ticketBlob) return;
@@ -901,6 +929,10 @@
   }
   async function sendPendingOrder() {
     if (!pendingOrder) return;
+    if (pendingOrder.ticketEnabled === false) {
+      openWhatsAppWithMessage();
+      return;
+    }
     if (!pendingOrder.ticketBlob) {
       $('#confirmFallbackText').textContent = 'No se pudo generar la imagen. Se abrirá WhatsApp con los datos del pedido en texto.';
       openWhatsAppWithMessage();
@@ -951,7 +983,7 @@
   async function loadConfig() {
     try {
       const settings = contentApi?.settings || await fetch('/data/settings.json', { cache: 'no-store' }).then(readJSONResponse);
-      config = { ...defaultConfig, ...settings, receipt: { ...defaultReceipt, ...(settings.receipt || {}) } };
+      config = { ...defaultConfig, ...settings, digitalTicketEnabled: settings.digitalTicketEnabled !== false, whatsappMessageTemplate: settings.whatsappMessageTemplate || defaultWhatsAppMessageTemplate, receipt: { ...defaultReceipt, ...(settings.receipt || {}) } };
     } catch {
       config = { ...defaultConfig, receipt: { ...defaultReceipt } };
     }
