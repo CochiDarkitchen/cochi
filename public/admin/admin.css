@@ -75,3 +75,24 @@ main{padding:12px 16px 20px;max-width:760px;margin:0 auto;display:grid;gap:14px}
 .chip--on{background:#d8f0df;color:#14532d}.chip--soon{background:#fff3c9;color:#5c4400}.chip--off{background:#fde4e2;color:#8c0b06}
 :where(a,button,input,select,textarea):focus-visible{outline:3px solid var(--ink);outline-offset:3px;box-shadow:0 0 0 6px var(--paper)}
 .savebar :focus-visible,.login :focus-visible{outline-color:#fff;box-shadow:0 0 0 6px var(--ink)}
+
+/* ---------- Editor de ticket WhatsApp ---------- */
+.ticket-toggles{display:grid;gap:12px}
+.ticket-toggles .sw{align-items:center}
+.ticket-admin-preview{--ticket-accent:#eb140c;width:min(100%,420px);margin:0 auto;padding:26px 22px;border:1px solid rgba(33,30,26,.12);border-top:7px solid var(--ticket-accent);border-radius:16px;background:#fffdf7;box-shadow:0 12px 30px rgba(33,30,26,.09);text-align:center;color:#29251f}
+.ticket-admin-preview>img{display:block;width:min(65%,240px);height:auto;max-height:74px;object-fit:contain;margin:0 auto 13px}
+.ticket-admin-preview>strong{display:block;margin-bottom:10px;color:var(--ticket-accent);font-size:16px;font-weight:900;letter-spacing:.08em}
+.ticket-admin-preview>b{display:block;font-size:16px;font-weight:900;line-height:1.3}
+.ticket-admin-preview>p{margin:6px 0 14px;color:#6f675a;font-size:11px;line-height:1.5}
+.ticket-admin-preview hr{border:0;border-top:1px dashed #d7cdb5;margin:14px 0}
+.ticket-admin-preview>small{display:block;color:#817969;font-size:10px}
+.ticket-admin-preview h4{margin:0 0 8px;color:var(--ticket-accent);font-size:11px;font-weight:900;letter-spacing:.08em;text-align:left}
+.ticket-admin-preview>div:not(.ticket-admin-preview__item){display:flex;justify-content:space-between;gap:8px;margin:6px 0;text-align:left;font-size:10px}
+.ticket-admin-preview>div span{color:#6f675a}
+.ticket-admin-preview>div b{font-weight:800}
+.ticket-admin-preview__item{padding:8px 0;text-align:left;font-size:11px}
+.ticket-admin-preview__item b,.ticket-admin-preview__item strong,.ticket-admin-preview__item small{display:block}
+.ticket-admin-preview__item strong{margin-top:3px;color:var(--ticket-accent)}
+.ticket-admin-preview__item small{margin-top:3px;color:#6f675a;font-size:9px}
+.ticket-admin-preview .ticket-admin-preview__total{padding-top:8px;border-top:1px solid #d7cdb5;color:var(--ticket-accent);font-size:13px;font-weight:900}
+@media(max-width:520px){.row2{grid-template-columns:1fr}.row-inline{align-items:stretch}.ticket-admin-preview{padding:22px 16px}}

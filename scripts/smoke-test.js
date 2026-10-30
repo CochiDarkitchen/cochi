@@ -12,6 +12,7 @@ const catalog = JSON.parse(fs.readFileSync(catalogPath, 'utf8'));
 const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
 const html = fs.readFileSync(path.join(publicDir, 'index.html'), 'utf8');
 const app = fs.readFileSync(path.join(publicDir, 'app.js'), 'utf8');
+const admin = fs.readFileSync(path.join(publicDir, 'admin/admin.js'), 'utf8');
 const css = fs.readFileSync(path.join(publicDir, 'styles.css'), 'utf8');
 
 function ok(message) { console.log(`OK: ${message}`); }
@@ -49,12 +50,16 @@ async function waitForServer(url, child) {
   assert.ok(Number(settings.usdToVes) > 0, 'La tasa manual debe ser mayor que cero.');
   assert.match(settings.exchangeRateDate, /^\d{4}-\d{2}-\d{2}$/, 'La fecha de tasa debe usar formato AAAA-MM-DD.');
   assert.ok(settings.orderModes.includes('delivery') && settings.orderModes.includes('pickup'));
+  assert.equal(settings.receipt.title, 'COMPROBANTE DE PEDIDO', 'El ticket debe tener valores predeterminados en el sitio.');
   assert.ok(app.includes("['Fri', 'Sat', 'Sun'].includes(weekday)"), 'Los pedidos solo continúan viernes, sábado y domingo.');
   assert.ok(app.includes('La preparación del pedido comienza únicamente después de que Cochi reciba el depósito acordado.'), 'WhatsApp debe comunicar la condición del depósito.');
   assert.ok(html.includes('La preparación comienza únicamente después de recibir el depósito acordado.'), 'La web debe comunicar cuándo comienza la preparación.');
   const messageBuilder = app.slice(app.indexOf('function buildWhatsAppMessage'), app.indexOf('function handleCheckoutSubmit'));
   assert.ok(messageBuilder.includes('Monto final') || messageBuilder.includes('monto final'));
   assert.ok(!messageBuilder.includes('currencyUSD') && !messageBuilder.includes('currencyVES') && !messageBuilder.includes('cartProductTotal'), 'WhatsApp no debe incluir montos calculados.');
+  assert.ok(app.includes('function buildOrderTicketBlob') && app.includes('navigator.share') && app.includes('downloadOrderTicket'), 'El pedido debe generar y compartir/descargar un ticket como imagen.');
+  assert.ok(html.includes('id=\"orderTicketImage\"') && html.includes('id=\"downloadTicket\"'), 'La confirmación debe mostrar una vista previa y descarga del ticket.');
+  assert.ok(admin.includes('Ticket WhatsApp') && admin.includes('settings.receipt.footerText'), 'El panel debe permitir editar los textos del ticket.');
   assert.ok(html.includes('TRABAJAMOS DE VIERNES A DOMINGO') && html.includes('orderScheduleNote'));
   assert.ok(!html.includes('/admin.html') && !app.includes('supabaseUrl') && !app.includes('/api/bcv') && !app.includes('/api/config'), 'La experiencia pública no debe depender de Admin, Supabase ni APIs de tasa.');
   const htmlIds = new Set([...html.matchAll(/\bid="([^"]+)"/g)].map(match => match[1]));
@@ -127,6 +132,13 @@ async function waitForServer(url, child) {
     assert.equal((await put(withExtras)).status, 200);
     const saved = await (await fetch(`${base}/api/content`)).json();
     assert.equal(saved.products[0].tag, 'Más pedido'); assert.equal(saved.settings.paymentInfo, 'Pago Móvil 0424-0000000'); assert.equal(saved.flyers[0].end, '2026-11-03');
+    const receiptDraft = JSON.parse(JSON.stringify(withExtras)); receiptDraft.settings.receipt.title = 'PEDIDO COCHI'; receiptDraft.settings.receipt.footerText = 'Gracias por tu compra.'; receiptDraft.settings.receipt.showAddress = false; receiptDraft.settings.receipt.accentColor = '#8a1712';
+    assert.equal((await put(receiptDraft)).status, 200, 'La personalización del ticket debe guardarse.');
+    const receiptSaved = await (await fetch(`${base}/api/content`)).json();
+    assert.equal(receiptSaved.settings.receipt.title, 'PEDIDO COCHI'); assert.equal(receiptSaved.settings.receipt.footerText, 'Gracias por tu compra.'); assert.equal(receiptSaved.settings.receipt.showAddress, false); assert.equal(receiptSaved.settings.receipt.accentColor, '#8a1712');
+    const legacyDraft = JSON.parse(JSON.stringify(receiptDraft)); delete legacyDraft.settings.receipt;
+    assert.equal((await put(legacyDraft)).status, 200, 'Una configuración previa sin ticket debe seguir siendo compatible.');
+    const legacySaved = await (await fetch(`${base}/api/content`)).json(); assert.equal(legacySaved.settings.receipt.title, 'COMPROBANTE DE PEDIDO');
     const backwards = JSON.parse(JSON.stringify(withExtras)); backwards.flyers[0].end = '2026-10-01';
     assert.equal((await put(backwards)).status, 400, 'La fecha final no puede ser anterior a la inicial.');
     const badDate = JSON.parse(JSON.stringify(withExtras)); badDate.upsells[0].start = '31/10/2026';

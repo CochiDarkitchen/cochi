@@ -86,11 +86,5 @@
     }
   ],
   "buildCommand": "node scripts/set-site-url.js",
-  "outputDirectory": "public",
-  "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": "/api"
-    }
-  ]
+  "outputDirectory": "public"
 }

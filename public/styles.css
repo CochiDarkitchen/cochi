@@ -365,3 +365,9 @@ legend b,label b,fieldset b{color:var(--red-ink)}
 .confirm-view>h3{margin:0 0 8px;font-size:37px;line-height:.97;letter-spacing:-.08em;font-weight:900}
 .confirm-view>h3 em{font-style:normal;color:var(--red-ink)}
 @media (max-width:760px){.confirm-view>h3{font-size:33px}}
+
+/* ---------- Ticket de pedido compartible ---------- */
+.order-ticket-card{gap:12px}
+.order-ticket__status,.order-ticket__hint{margin:0;color:var(--muted,#70695d);font-size:12.5px;line-height:1.5}
+.order-ticket__image{display:block;width:min(100%,430px);max-height:560px;object-fit:contain;margin:0 auto;border:1px solid rgba(33,30,26,.12);border-radius:12px;background:#fffdf7;box-shadow:0 12px 32px rgba(33,30,26,.10)}
+.order-ticket__hint{text-align:center}

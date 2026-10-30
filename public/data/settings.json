@@ -7,5 +7,31 @@
   "deliveryFeeUSD": null,
   "usdToVes": 887.302,
   "exchangeRateDate": "2026-10-27",
-  "exchangeRateName": "Tasa BCV actualizada por Cochi"
+  "exchangeRateName": "Tasa BCV actualizada por Cochi",
+  "receipt": {
+    "businessName": "COCHI",
+    "title": "COMPROBANTE DE PEDIDO",
+    "subtitle": "Tu pedido está listo para confirmar",
+    "customerHeading": "DATOS DEL CLIENTE",
+    "orderHeading": "DETALLE DEL PEDIDO",
+    "summaryHeading": "RESUMEN",
+    "subtotalLabel": "Subtotal",
+    "deliveryLabel": "Delivery",
+    "totalLabel": "Total estimado",
+    "vesLabel": "Total referencial en bolívares",
+    "footerText": "El monto final y el costo de entrega se confirman directamente por WhatsApp.",
+    "thankYouText": "¡Gracias por elegir Cochi!",
+    "accentColor": "#eb140c",
+    "showLogo": true,
+    "showDate": true,
+    "showOrderCode": true,
+    "showPhone": true,
+    "showMode": true,
+    "showAddress": true,
+    "showSector": true,
+    "showReference": true,
+    "showOrderNotes": true,
+    "showItemOptions": true,
+    "showBs": true
+  }
 }
