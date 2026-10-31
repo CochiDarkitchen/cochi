@@ -6,28 +6,13 @@
   const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
   const CART_KEY = 'cochi-cart-v1';
   const INTRO_KEY = 'cochi-intro-seen-v1';
-  const defaultReceipt = {
-    businessName: 'COCHI', title: 'COMPROBANTE DE PEDIDO', subtitle: 'Tu pedido está listo para confirmar',
-    customerHeading: 'DATOS DEL CLIENTE', orderHeading: 'DETALLE DEL PEDIDO', summaryHeading: 'RESUMEN',
-    subtotalLabel: 'Subtotal', deliveryLabel: 'Delivery', totalLabel: 'Total estimado',
-    vesLabel: 'Total referencial en bolívares',
-    footerText: 'El monto final y el costo de entrega se confirman directamente por WhatsApp.',
-    thankYouText: '¡Gracias por elegir Cochi!', accentColor: '#eb140c',
-    showLogo: true, showDate: true, showOrderCode: true, showPhone: true, showMode: true,
-    showAddress: true, showSector: true, showReference: true, showOrderNotes: true,
-    showItemOptions: true, showBs: true
-  };
-  const defaultWhatsAppMessageTemplate = "¡Hola, Cochi! Quiero consultar y coordinar este pedido.\n\n*DATOS DEL CLIENTE*\nNombre: {{NOMBRE}}\n{{TELEFONO_BLOQUE}}\nModalidad: {{MODALIDAD}}\n{{DIRECCION_BLOQUE}}\n\n*MI PEDIDO*\n{{PEDIDO}}\n\n{{NOTAS_BLOQUE}}\n\n*CONFIRMACIÓN Y PAGO*\nEl monto final, la disponibilidad, el costo de entrega y los datos de pago se confirman directamente por este chat.\nLa preparación del pedido comienza únicamente después de que Cochi reciba el depósito acordado.\n\nCochi recibe pedidos únicamente de viernes a domingo.\nCódigo: {{CODIGO_PEDIDO}}\n¡Gracias!";
   const defaultConfig = {
     whatsappNumber: '584242246392',
     orderModes: ['delivery', 'pickup'],
     deliveryFeeUSD: null,
     usdToVes: 887.302,
     exchangeRateDate: '2026-10-27',
-    exchangeRateName: 'Tasa BCV actualizada por Cochi',
-    digitalTicketEnabled: true,
-    whatsappMessageTemplate: defaultWhatsAppMessageTemplate,
-    receipt: defaultReceipt
+    exchangeRateName: 'Tasa BCV actualizada por Cochi'
   };
 
   let config = { ...defaultConfig };
@@ -82,12 +67,12 @@
     return ['Fri', 'Sat', 'Sun'].includes(weekday);
   }
   function orderScheduleMessage() {
-    return 'Pedidos disponibles de viernes a domingo.';
+    return 'Cochi recibe pedidos únicamente de viernes a domingo. Puedes explorar el menú y preparar tu selección; vuelve durante esos días para enviarla por WhatsApp.';
   }
   function updateScheduleNotice() {
     const note = $('#orderScheduleNote');
     if (note) {
-      note.textContent = isOrderDay() ? '¡Pedidos abiertos! Viernes a domingo.' : orderScheduleMessage();
+      note.textContent = isOrderDay() ? '¡Estamos en días de pedidos! Trabajamos de viernes a domingo.' : orderScheduleMessage();
       note.classList.toggle('is-closed', !isOrderDay());
     }
     const button = $('#startCheckout');
@@ -255,12 +240,40 @@
     prepReveal($$('.product-card', target));
   }
   function renderDulceFeatured() {
-    const product = products.find(p => p.slug === 'marquesa-chocolate' && p.is_visible) || products.find(p => p.brand === 'dulce' && !p.is_coming_soon && p.is_visible);
-    if (!product) {
-      $('#dulceFeatured').hidden = true;
-      return;
+    const target = $('#dulceProducts');
+    if (!target) return;
+    const sweetProducts = products
+      .filter(product => product.brand === 'dulce' && product.is_visible)
+      .sort((a, b) => a.sort_order - b.sort_order);
+    target.hidden = sweetProducts.length === 0;
+    target.innerHTML = sweetProducts.map(product => {
+      const availability = productAvailability(product);
+      const photo = safeAssetPath(product.image);
+      const picture = photo
+        ? `<img class="dulce-product__photo" src="${escapeHtml(photo)}" alt="Fotografía de ${escapeHtml(product.name)}" loading="lazy" decoding="async" width="124" height="124">`
+        : `<img src="/assets/brand/dulce-isotipo-chocolate.png" alt="" width="42" height="45">`;
+      const label = product.is_coming_soon ? 'UN NUEVO ANTOJO' : (product.tag ? escapeHtml(product.tag.toUpperCase()) : 'COCHI DULCE');
+      const price = product.is_coming_soon
+        ? '<b class="dulce-product__soon">MUY PRONTO</b>'
+        : `<b>${currencyUSD(product.price_usd)}${getConvertedPrice(product.price_usd) !== null ? ' · ' + currencyVES(getConvertedPrice(product.price_usd)) : ''}</b>`;
+      const action = availability.canOrder
+        ? `<button class="round-add round-add--dulce" type="button" data-product-slug="${escapeHtml(product.slug)}" aria-label="Elegir ${escapeHtml(product.name)}">+</button>`
+        : `<span class="dulce-product__status">${product.is_coming_soon ? 'PRÓXIMAMENTE' : escapeHtml(availability.label || 'NO DISPONIBLE')}</span>`;
+      return `<article class="dulce-product${product.is_coming_soon ? ' dulce-product--soon' : ''}"><div class="dulce-product__thumb">${picture}</div><div class="dulce-product__text"><span>${label}</span><strong>${escapeHtml(product.name)}</strong><small>${escapeHtml(product.description)}</small>${price}</div>${action}</article>`;
+    }).join('');
+
+    const firstReady = sweetProducts.find(product => productAvailability(product).canOrder);
+    const orderButton = $('#dulceOrderButton');
+    if (orderButton) {
+      if (firstReady) {
+        orderButton.hidden = false;
+        orderButton.dataset.productSlug = firstReady.slug;
+        orderButton.disabled = false;
+      } else {
+        orderButton.hidden = true;
+        orderButton.removeAttribute('data-product-slug');
+      }
     }
-    $('#dulceFeatured').innerHTML = `<div class="dulce-product__thumb"><img src="/assets/brand/dulce-isotipo-chocolate.png" alt="" width="58" height="62"></div><div class="dulce-product__text"><span>EL CLÁSICO DULCE</span><strong>${escapeHtml(product.name)}</strong><small>${escapeHtml(product.description)}</small><b>${currencyUSD(product.price_usd)}${getConvertedPrice(product.price_usd) !== null ? ' · ' + currencyVES(getConvertedPrice(product.price_usd)) : ''}</b></div><button class="round-add round-add--dulce" type="button" data-product-slug="${escapeHtml(product.slug)}" aria-label="Elegir ${escapeHtml(product.name)}">+</button>`;
   }
 
   function lineKey(slug, selections, note) {
@@ -638,40 +651,30 @@
     const reference = String(data.get('reference') || '').trim();
     const orderNotes = String(data.get('orderNotes') || '').trim();
     const modeLabel = mode === 'delivery' ? 'Entrega a domicilio' : mode === 'pickup' ? 'Retiro' : mode;
-    const orderLines = [];
+    const rows = ['¡Hola, Cochi! Quiero consultar y coordinar este pedido.', '', '*DATOS DEL CLIENTE*', `Nombre: ${fullName}`];
+    if (phone) rows.push(`Teléfono: ${phone}`);
+    rows.push(`Modalidad: ${modeLabel}`);
+    if (mode === 'delivery') {
+      if (address) rows.push(`Dirección: ${address}`);
+      if (sector) rows.push(`Sector / urbanización: ${sector}`);
+      if (reference) rows.push(`Referencia: ${reference}`);
+    }
+    rows.push('', '*MI PEDIDO*');
     cart.forEach((line, index) => {
       const product = productFromCatalog(line.slug);
       if (!product) return;
-      orderLines.push(`${index + 1}. ${product.name} — Cantidad: ${line.quantity}`);
-      if (line.promo) { const promoRule = upsellRule(line.promo); if (promoRule) orderLines.push(`   Promoción: ${promoRule.title}`); }
+      rows.push(`${index + 1}. ${product.name}`);
+      rows.push(`   Cantidad: ${line.quantity}`);
+      if (line.promo) { const promoRule = upsellRule(line.promo); if (promoRule) rows.push(`   Promo: ${promoRule.title}`); }
       const options = line.selections.map(selection => `${selection.groupName}: ${selection.choiceLabel}${selection.quantity > 1 ? ` x${selection.quantity}` : ''}`);
-      if (options.length) orderLines.push(`   Opciones: ${options.join('; ')}`);
-      if (line.note.trim()) orderLines.push(`   Observaciones: ${line.note.trim()}`);
+      if (options.length) rows.push(`   Opciones: ${options.join('; ')}`);
+      if (line.note.trim()) rows.push(`   Observaciones: ${line.note.trim()}`);
+      rows.push('');
     });
-    const addressParts = [];
-    if (mode === 'delivery' && address) addressParts.push(`Dirección: ${address}`);
-    if (mode === 'delivery' && sector) addressParts.push(`Sector / urbanización: ${sector}`);
-    if (mode === 'delivery' && reference) addressParts.push(`Referencia: ${reference}`);
-    const phoneBlock = phone ? `Teléfono: ${phone}` : '';
-    const addressBlock = addressParts.join('\n');
-    const notesBlock = orderNotes ? `*NOTAS ADICIONALES*\n${orderNotes}` : '';
-    const orderCode = pendingOrder?.code || '';
-    const values = {
-      NOMBRE: fullName,
-      TELEFONO: phone,
-      TELEFONO_BLOQUE: phoneBlock,
-      MODALIDAD: modeLabel,
-      DIRECCION: mode === 'delivery' ? address : '',
-      SECTOR: mode === 'delivery' ? sector : '',
-      REFERENCIA: mode === 'delivery' ? reference : '',
-      DIRECCION_BLOQUE: addressBlock,
-      PEDIDO: orderLines.join('\n'),
-      NOTAS: orderNotes,
-      NOTAS_BLOQUE: notesBlock,
-      CODIGO_PEDIDO: orderCode
-    };
-    const template = String(config.whatsappMessageTemplate || defaultWhatsAppMessageTemplate);
-    return template.replace(/\{\{([A-Z0-9_]+)\}\}/g, (token, key) => Object.prototype.hasOwnProperty.call(values, key) ? values[key] : token).trim();
+    rows.push('*CONFIRMACIÓN Y PAGO*', 'El monto final, la disponibilidad, el costo de entrega y los datos de pago se confirman directamente por este chat.', 'La preparación del pedido comienza únicamente después de que Cochi reciba el depósito acordado.');
+    if (orderNotes) rows.push('', '*NOTAS ADICIONALES*', orderNotes);
+    rows.push('', 'Cochi recibe pedidos únicamente de viernes a domingo.', '¡Gracias!');
+    return rows.join('\n');
   }
   function handleCheckoutSubmit(event) {
     event.preventDefault();
@@ -687,10 +690,7 @@
       $('#checkoutError').hidden = false;
       return;
     }
-    if (pendingOrder?.ticketObjectUrl) URL.revokeObjectURL(pendingOrder.ticketObjectUrl);
-    const stamp = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Caracas', year: '2-digit', month: '2-digit', day: '2-digit' }).format(new Date()).replace(/\D/g, '');
-    const suffix = Math.random().toString(36).slice(2, 6).toUpperCase();
-    pendingOrder = { data: validation.data, number, code: `CO-${stamp}-${suffix}`, ticketEnabled: config.digitalTicketEnabled !== false, ticketBlob: null, ticketObjectUrl: null };
+    pendingOrder = { data: validation.data, number };
     showConfirm();
   }
   function showConfirm() {
@@ -699,195 +699,8 @@
     $('#cartDrawer').scrollTop = 0;
     $('#confirmTitle').focus({ preventScroll: true });
   }
-  function receiptSettings() {
-    return { ...defaultReceipt, ...(config.receipt || {}) };
-  }
-  function receiptDate() {
-    return new Intl.DateTimeFormat('es-VE', { dateStyle: 'long', timeStyle: 'short', timeZone: 'America/Caracas' }).format(new Date());
-  }
-  function loadReceiptLogo() {
-    return new Promise(resolve => {
-      const logo = new Image();
-      logo.onload = () => resolve(logo);
-      logo.onerror = () => resolve(null);
-      logo.src = '/assets/brand/cochi-logo-red.png';
-    });
-  }
-  function wrapReceiptText(ctx, text, maxWidth) {
-    const words = String(text ?? '').split(/\s+/).filter(Boolean);
-    if (!words.length) return [''];
-    const lines = []; let line = '';
-    words.forEach(word => {
-      const candidate = line ? `${line} ${word}` : word;
-      if (line && ctx.measureText(candidate).width > maxWidth) { lines.push(line); line = word; }
-      else line = candidate;
-    });
-    if (line) lines.push(line);
-    return lines;
-  }
-  async function buildOrderTicketBlob() {
-    if (!pendingOrder) throw new Error('No hay un pedido para generar.');
-    const r = receiptSettings();
-    const width = 900, pad = 64, inner = width - pad * 2;
-    const form = pendingOrder.data;
-    const mode = String(form.get('orderMode') || getSelectedMode());
-    const fullName = String(form.get('customerName') || '').trim();
-    const phone = String(form.get('customerPhone') || '').trim();
-    const address = String(form.get('address') || '').trim();
-    const sector = String(form.get('sector') || '').trim();
-    const reference = String(form.get('reference') || '').trim();
-    const orderNotes = String(form.get('orderNotes') || '').trim();
-    const modeLabel = mode === 'delivery' ? 'Entrega a domicilio' : mode === 'pickup' ? 'Retiro en Cochi' : mode;
-    const subtotal = cartProductTotal();
-    const fee = cartFee(mode);
-    const estimatedTotal = subtotal + (fee === null ? 0 : fee);
-    const bolivares = getConvertedPrice(estimatedTotal);
-    const logo = r.showLogo ? await loadReceiptLogo() : null;
-    const accent = /^#[0-9a-fA-F]{6}$/.test(r.accentColor || '') ? r.accentColor : '#eb140c';
-
-    function layout(ctx, draw) {
-      let y = 54;
-      const x = pad;
-      const setFont = (size, weight = 500) => { ctx.font = `${weight} ${size}px Montserrat, Arial, sans-serif`; };
-      const paragraph = (text, options = {}) => {
-        const size = options.size || 23, weight = options.weight || 500, color = options.color || '#29251f';
-        const lineHeight = options.lineHeight || Math.round(size * 1.48), align = options.align || 'left';
-        const maxWidth = options.maxWidth || inner;
-        setFont(size, weight);
-        const lines = wrapReceiptText(ctx, text, maxWidth);
-        if (draw) {
-          ctx.fillStyle = color; ctx.textAlign = align;
-          const textX = align === 'center' ? width / 2 : align === 'right' ? width - pad : x;
-          lines.forEach((line, i) => ctx.fillText(line, textX, y + i * lineHeight));
-        }
-        y += lines.length * lineHeight + (options.after === undefined ? 12 : options.after);
-        return lines.length;
-      };
-      const divider = () => {
-        y += 12;
-        if (draw) { ctx.save(); ctx.strokeStyle = '#d7cdb5'; ctx.lineWidth = 2; ctx.setLineDash([7, 8]); ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(width - pad, y); ctx.stroke(); ctx.restore(); }
-        y += 22;
-      };
-      const heading = text => paragraph(text, { size: 22, weight: 900, color: accent, after: 12 });
-      const pair = (label, value, options = {}) => {
-        const labelWidth = options.labelWidth || 258, gap = 22, valueWidth = inner - labelWidth - gap;
-        const size = options.size || 20, weight = options.weight || 500, lineHeight = Math.round(size * 1.42);
-        setFont(size, weight); const leftLines = wrapReceiptText(ctx, label, labelWidth);
-        setFont(size, options.valueWeight || weight); const rightLines = wrapReceiptText(ctx, value, valueWidth);
-        const count = Math.max(leftLines.length, rightLines.length);
-        if (draw) {
-          ctx.textAlign = 'left'; ctx.fillStyle = options.labelColor || '#6f675a'; setFont(size, weight);
-          leftLines.forEach((line, i) => ctx.fillText(line, x, y + i * lineHeight));
-          ctx.textAlign = options.alignRight === false ? 'left' : 'right'; ctx.fillStyle = options.valueColor || '#29251f'; setFont(size, options.valueWeight || weight);
-          rightLines.forEach((line, i) => ctx.fillText(line, options.alignRight === false ? x + labelWidth + gap : width - pad, y + i * lineHeight));
-        }
-        y += count * lineHeight + 11;
-      };
-      const money = (label, value, options = {}) => pair(label, value, { labelWidth: 430, size: options.size || 22, weight: options.weight || 500, valueWeight: options.valueWeight || 800, labelColor: options.labelColor, valueColor: options.valueColor });
-
-      if (draw) {
-        ctx.fillStyle = '#fffdf7'; ctx.fillRect(0, 0, width, ctx.canvas.height);
-        ctx.fillStyle = accent; ctx.fillRect(0, 0, width, 16);
-        ctx.strokeStyle = '#e7deca'; ctx.lineWidth = 2; ctx.strokeRect(18, 18, width - 36, ctx.canvas.height - 36);
-        ctx.fillStyle = accent; ctx.fillRect(width / 2 - 36, 42, 72, 6);
-      }
-      if (logo) {
-        const maxW = 300, maxH = 104, ratio = Math.min(maxW / logo.width, maxH / logo.height);
-        const w = logo.width * ratio, h = logo.height * ratio;
-        if (draw) ctx.drawImage(logo, (width - w) / 2, y, w, h);
-        y += h + 20;
-        paragraph(r.businessName, { size: 22, weight: 900, color: accent, align: 'center', after: 22 });
-      } else {
-        paragraph(r.businessName, { size: 38, weight: 900, color: accent, align: 'center', after: 20 });
-      }
-      paragraph(r.title, { size: 30, weight: 900, align: 'center', after: 7 });
-      if (r.subtitle) paragraph(r.subtitle, { size: 19, color: '#6f675a', align: 'center', after: 22 });
-      divider();
-      if (r.showDate) paragraph(`Fecha: ${receiptDate()}`, { size: 17, color: '#6f675a', after: 7 });
-      if (r.showOrderCode) paragraph(`Pedido: ${pendingOrder.code}`, { size: 17, weight: 800, color: accent, after: 14 });
-      heading(r.customerHeading);
-      pair('Nombre completo', fullName, { valueWeight: 800 });
-      if (r.showPhone && phone) pair('Teléfono', phone);
-      if (r.showMode) pair('Modalidad', modeLabel);
-      if (mode === 'delivery' && r.showAddress && address) pair('Dirección', address);
-      if (mode === 'delivery' && r.showSector && sector) pair('Sector / urbanización', sector);
-      if (mode === 'delivery' && r.showReference && reference) pair('Referencia', reference);
-      divider();
-      heading(r.orderHeading);
-      cart.forEach((line, index) => {
-        const product = productFromCatalog(line.slug);
-        if (!product) return;
-        paragraph(`${line.quantity} × ${product.name}`, { size: 23, weight: 800, after: 4 });
-        pair('Importe', currencyUSD(lineUnitPrice(line) * line.quantity), { valueWeight: 800, size: 20 });
-        if (line.promo) {
-          const promoRule = upsellRule(line.promo);
-          if (promoRule) paragraph(`Promoción: ${promoRule.title}`, { size: 17, color: accent, after: 4 });
-        }
-        if (r.showItemOptions) {
-          (line.selections || []).forEach(selection => paragraph(`${selection.groupName}: ${selection.choiceLabel}${selection.quantity > 1 ? ` × ${selection.quantity}` : ''}`, { size: 17, color: '#6f675a', after: 3 }));
-          if (line.note?.trim()) paragraph(`Observación: ${line.note.trim()}`, { size: 17, color: '#6f675a', after: 5 });
-        }
-        if (index < cart.length - 1) { y += 5; if (draw) { ctx.strokeStyle = '#eee7d8'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(width - pad, y); ctx.stroke(); } y += 16; }
-      });
-      if (r.showOrderNotes && orderNotes) {
-        divider(); heading('NOTAS ADICIONALES');
-        paragraph(orderNotes, { size: 18, color: '#514b42', after: 8 });
-      }
-      divider();
-      heading(r.summaryHeading);
-      money(r.subtotalLabel, currencyUSD(subtotal));
-      if (mode === 'delivery') money(r.deliveryLabel, fee === null ? 'Por confirmar' : currencyUSD(fee));
-      money(r.totalLabel + (mode === 'delivery' && fee === null ? '*' : ''), currencyUSD(estimatedTotal), { size: 27, weight: 900, valueWeight: 900, labelColor: accent, valueColor: accent });
-      if (r.showBs && bolivares !== null) {
-        money(r.vesLabel, currencyVES(bolivares), { size: 21, weight: 800, valueWeight: 900 });
-        if (rate?.usdVES) paragraph(`Conversión referencial: $1 = ${currencyVES(rate.usdVES)} · Tasa: ${formatDate(rate.effectiveDate)}`, { size: 15, color: '#817969', after: 10 });
-      }
-      if (mode === 'delivery' && fee === null) paragraph('*El costo de entrega se confirma por WhatsApp.', { size: 15, color: '#817969', after: 12 });
-      divider();
-      if (r.footerText) paragraph(r.footerText, { size: 17, color: '#6f675a', align: 'center', after: 16 });
-      paragraph(r.thankYouText, { size: 23, weight: 900, color: accent, align: 'center', after: 38 });
-      if (draw) {
-        ctx.fillStyle = accent; ctx.fillRect(width / 2 - 44, y - 12, 88, 5);
-      }
-      return y + 24;
-    }
-
-    const measureCanvas = document.createElement('canvas'); measureCanvas.width = width; measureCanvas.height = 1;
-    const measuredEnd = layout(measureCanvas.getContext('2d'), false);
-    const canvas = document.createElement('canvas'); canvas.width = width; canvas.height = Math.ceil(measuredEnd + 30);
-    layout(canvas.getContext('2d'), true);
-    return new Promise((resolve, reject) => canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('No se pudo crear la imagen del ticket.')), 'image/png'));
-  }
-  async function prepareOrderTicketPreview() {
-    if (!pendingOrder) return;
-    const code = pendingOrder.code;
-    const image = $('#orderTicketImage'), status = $('#orderTicketStatus'), share = $('#confirmSend'), download = $('#downloadTicket');
-    share.disabled = true; download.disabled = true;
-    status.textContent = 'Preparando la imagen del ticket…';
-    try {
-      const blob = await buildOrderTicketBlob();
-      if (!pendingOrder || pendingOrder.code !== code) return;
-      pendingOrder.ticketBlob = blob;
-      if (pendingOrder.ticketObjectUrl) URL.revokeObjectURL(pendingOrder.ticketObjectUrl);
-      pendingOrder.ticketObjectUrl = URL.createObjectURL(blob);
-      image.src = pendingOrder.ticketObjectUrl; image.hidden = false;
-      status.textContent = 'Vista previa lista. Puedes compartir la imagen o descargarla.';
-      share.disabled = false; download.disabled = false;
-    } catch (error) {
-      status.textContent = 'No se pudo generar la vista previa. Puedes volver a intentarlo o enviar el pedido como texto.';
-      share.disabled = false; download.disabled = true;
-      console.error('Ticket Cochi:', error);
-    }
-  }
   function renderConfirm() {
     const data = pendingOrder.data, mode = String(data.get('orderMode') || getSelectedMode());
-    const ticketEnabled = pendingOrder.ticketEnabled !== false;
-    $('#orderTicketCard').hidden = !ticketEnabled;
-    $('#confirmSendLabel').textContent = ticketEnabled ? 'Compartir ticket + pedido' : 'Enviar pedido por WhatsApp';
-    $('#confirmSend').disabled = false;
-    $('#confirmStepsList').innerHTML = ticketEnabled
-      ? '<li>Comparte el ticket y el detalle de tu pedido con Cochi por WhatsApp.</li><li>Cochi confirma disponibilidad, monto final y costo de entrega.</li><li>Envías el depósito acordado y empezamos a preparar tu pedido.</li>'
-      : '<li>Envía el detalle de tu pedido a Cochi por WhatsApp.</li><li>Cochi confirma disponibilidad, monto final y costo de entrega.</li><li>Envías el depósito acordado y empezamos a preparar tu pedido.</li>';
     $('#confirmLines').innerHTML = cart.map(line => {
       const product = productFromCatalog(line.slug); if (!product) return '';
       const extra = [...line.selections.map(s => `${escapeHtml(s.groupName)}: ${escapeHtml(s.choiceLabel)}${s.quantity > 1 ? ` x${s.quantity}` : ''}`), line.note ? `Nota: ${escapeHtml(line.note)}` : ''].filter(Boolean).join(' · ');
@@ -899,25 +712,8 @@
     $('#confirmData').innerHTML = rows.filter(([, value]) => String(value || '').trim()).map(([label, value]) => `<div><dt>${label}</dt><dd>${escapeHtml(String(value).trim())}</dd></div>`).join('');
     const pay = String(config.paymentInfo || '').trim();
     $('#confirmPay').hidden = !pay; $('#confirmPayText').textContent = pay;
-    $('#orderTicketImage').hidden = true;
-    $('#downloadTicket').disabled = true;
-    if (ticketEnabled) {
-      $('#orderTicketStatus').textContent = 'Preparando la imagen del ticket…';
-      prepareOrderTicketPreview();
-    } else {
-      if (pendingOrder.ticketObjectUrl) URL.revokeObjectURL(pendingOrder.ticketObjectUrl);
-      pendingOrder.ticketBlob = null;
-      pendingOrder.ticketObjectUrl = null;
-    }
   }
-  function downloadOrderTicket() {
-    if (!pendingOrder?.ticketBlob) return;
-    const link = document.createElement('a');
-    link.href = pendingOrder.ticketObjectUrl || URL.createObjectURL(pendingOrder.ticketBlob);
-    link.download = `cochi-${pendingOrder.code.toLowerCase()}.png`;
-    document.body.appendChild(link); link.click(); link.remove();
-  }
-  function openWhatsAppWithMessage() {
+  function sendPendingOrder() {
     if (!pendingOrder) return;
     const url = `https://wa.me/${pendingOrder.number}?text=${encodeURIComponent(buildWhatsAppMessage(pendingOrder.data))}`;
     $('#confirmFallbackLink').href = url; $('#confirmFallback').hidden = false;
@@ -926,39 +722,6 @@
     let opened = null;
     try { opened = window.open(url, '_blank'); if (opened) opened.opener = null; } catch { opened = null; }
     if (!opened) window.location.assign(url);
-  }
-  async function sendPendingOrder() {
-    if (!pendingOrder) return;
-    if (pendingOrder.ticketEnabled === false) {
-      openWhatsAppWithMessage();
-      return;
-    }
-    if (!pendingOrder.ticketBlob) {
-      $('#confirmFallbackText').textContent = 'No se pudo generar la imagen. Se abrirá WhatsApp con los datos del pedido en texto.';
-      openWhatsAppWithMessage();
-      return;
-    }
-    const whatsappUrl = `https://wa.me/${pendingOrder.number}?text=${encodeURIComponent(buildWhatsAppMessage(pendingOrder.data))}`;
-    $('#confirmFallbackLink').href = whatsappUrl;
-    let file = null;
-    try { if (typeof File === 'function') file = new File([pendingOrder.ticketBlob], `cochi-${pendingOrder.code.toLowerCase()}.png`, { type: 'image/png' }); } catch { file = null; }
-    const message = buildWhatsAppMessage(pendingOrder.data);
-    let canShareFile = false;
-    try { canShareFile = Boolean(file && typeof navigator.share === 'function' && typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] })); } catch { canShareFile = false; }
-    if (canShareFile) {
-      try {
-        await navigator.share({ files: [file], title: `Pedido ${pendingOrder.code} · Cochi`, text: message });
-        $('#confirmFallback').hidden = false;
-        $('#confirmFallbackText').textContent = 'El menú de compartir se cerró. Verifica que el ticket y el mensaje se hayan enviado a Cochi.';
-        showToast('Se abrió la opción para compartir tu ticket.');
-        return;
-      } catch (error) {
-        if (error?.name === 'AbortError') return;
-      }
-    }
-    downloadOrderTicket();
-    $('#confirmFallbackText').textContent = 'El ticket se descargó. Al abrir WhatsApp, adjunta la imagen desde tus Descargas antes de enviar el pedido.';
-    openWhatsAppWithMessage();
   }
   async function copyPaymentInfo() {
     const text = $('#confirmPayText').textContent;
@@ -983,9 +746,9 @@
   async function loadConfig() {
     try {
       const settings = contentApi?.settings || await fetch('/data/settings.json', { cache: 'no-store' }).then(readJSONResponse);
-      config = { ...defaultConfig, ...settings, digitalTicketEnabled: settings.digitalTicketEnabled !== false, whatsappMessageTemplate: settings.whatsappMessageTemplate || defaultWhatsAppMessageTemplate, receipt: { ...defaultReceipt, ...(settings.receipt || {}) } };
+      config = { ...defaultConfig, ...settings };
     } catch {
-      config = { ...defaultConfig, receipt: { ...defaultReceipt } };
+      config = { ...defaultConfig };
     }
     if (!Array.isArray(config.orderModes) || !config.orderModes.length) config.orderModes = ['delivery', 'pickup'];
     const usdVES = Number(config.usdToVes);
@@ -1000,7 +763,8 @@
     catch { localProducts = []; }
     products = (Array.isArray(localProducts) ? localProducts : [])
       .map(normalizeProduct)
-      .filter(product => product.slug && product.name)
+      // Oculta el registro antiguo de brownies incluso antes de guardar la migración desde Admin.
+      .filter(product => product.slug && product.name && !(product.brand === 'dulce' && (product.slug === 'brownies-proximamente' || product.name.trim().toLocaleLowerCase('es') === 'brownies')))
       .sort((a,b) => a.sort_order - b.sort_order);
   }
 
@@ -1328,7 +1092,6 @@
     $('#backToCart').addEventListener('click', () => { $('#checkoutView').hidden = true; $('#cartView').hidden = false; });
     $('#backToData').addEventListener('click', () => { $('#confirmView').hidden = true; $('#checkoutView').hidden = false; $('#cartDrawer').scrollTop = 0; $('#checkoutForm [name="customerName"]')?.focus({ preventScroll: true }); });
     $('#confirmSend').addEventListener('click', sendPendingOrder);
-    $('#downloadTicket').addEventListener('click', downloadOrderTicket);
     $('#copyPay').addEventListener('click', copyPaymentInfo);
     $('#checkoutForm').addEventListener('submit', handleCheckoutSubmit);
     $('#checkoutForm').addEventListener('change', event => {

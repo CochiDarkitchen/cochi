@@ -2,10 +2,8 @@
   'use strict';
   const $ = (s, r = document) => r.querySelector(s);
   const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const TABS = [['tasa', 'Tasa y datos'], ['ticket', 'Ticket WhatsApp'], ['productos', 'Productos'], ['flyers', 'Flyers'], ['comentarios', 'Comentarios'], ['ofertas', 'Ofertas y avisos']];
+  const TABS = [['tasa', 'Tasa y datos'], ['productos', 'Productos'], ['flyers', 'Flyers'], ['comentarios', 'Comentarios'], ['ofertas', 'Ofertas y avisos']];
   let data = null, tab = 'tasa', dirty = false, openSlug = null, query = '', storage = 'file', fromDefaults = false, toastTimer = null;
-  const defaultReceipt = { businessName: 'COCHI', title: 'COMPROBANTE DE PEDIDO', subtitle: 'Tu pedido está listo para confirmar', customerHeading: 'DATOS DEL CLIENTE', orderHeading: 'DETALLE DEL PEDIDO', summaryHeading: 'RESUMEN', subtotalLabel: 'Subtotal', deliveryLabel: 'Delivery', totalLabel: 'Total estimado', vesLabel: 'Total referencial en bolívares', footerText: 'El monto final y el costo de entrega se confirman directamente por WhatsApp.', thankYouText: '¡Gracias por elegir Cochi!', accentColor: '#eb140c', showLogo: true, showDate: true, showOrderCode: true, showPhone: true, showMode: true, showAddress: true, showSector: true, showReference: true, showOrderNotes: true, showItemOptions: true, showBs: true };
-  const defaultWhatsAppMessageTemplate = "¡Hola, Cochi! Quiero consultar y coordinar este pedido.\n\n*DATOS DEL CLIENTE*\nNombre: {{NOMBRE}}\n{{TELEFONO_BLOQUE}}\nModalidad: {{MODALIDAD}}\n{{DIRECCION_BLOQUE}}\n\n*MI PEDIDO*\n{{PEDIDO}}\n\n{{NOTAS_BLOQUE}}\n\n*CONFIRMACIÓN Y PAGO*\nEl monto final, la disponibilidad, el costo de entrega y los datos de pago se confirman directamente por este chat.\nLa preparación del pedido comienza únicamente después de que Cochi reciba el depósito acordado.\n\nCochi recibe pedidos únicamente de viernes a domingo.\nCódigo: {{CODIGO_PEDIDO}}\n¡Gracias!";
 
   async function api(path, options = {}) {
     const response = await fetch(`/api/admin/${path}`, { credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, ...options });
@@ -54,41 +52,8 @@
         ${field('Costo de delivery en USD', 'settings.deliveryFeeUSD', s.deliveryFeeUSD ?? '', 'type="number" data-t="nullable" step="0.01" min="0" inputmode="decimal"', 'Déjalo vacío si el costo se coordina por WhatsApp.')}
         <label class="field">Datos para el depósito (opcional)<textarea data-b="settings.paymentInfo" maxlength="500" rows="4">${esc(s.paymentInfo)}</textarea><small>Se muestran en la pantalla de confirmación, con un botón para copiarlos. Por ejemplo: banco, cuenta, titular y cédula, o Pago Móvil.</small></label></section>`;
     },
-    ticket() {
-      const r = data.settings.receipt;
-      const ticketEnabled = data.settings.digitalTicketEnabled !== false;
-      const messageTemplate = data.settings.whatsappMessageTemplate || defaultWhatsAppMessageTemplate;
-      const toggles = [
-        ['showLogo', 'Mostrar el logotipo'], ['showDate', 'Mostrar fecha y hora'], ['showOrderCode', 'Mostrar número de pedido'],
-        ['showPhone', 'Mostrar teléfono del cliente'], ['showMode', 'Mostrar modalidad (delivery / retiro)'],
-        ['showAddress', 'Mostrar dirección de entrega'], ['showSector', 'Mostrar sector / urbanización'],
-        ['showReference', 'Mostrar referencia para llegar'], ['showOrderNotes', 'Mostrar notas adicionales'],
-        ['showItemOptions', 'Mostrar opciones y observaciones de los productos'], ['showBs', 'Mostrar conversión estimada a bolívares']
-      ];
-      return `<section class="card"><h2>Envío del pedido por WhatsApp</h2><p class="card__intro">Elige cómo quieres que el cliente envíe su pedido. Puedes compartir un ticket digital en imagen o desactivarlo para que el botón abra WhatsApp directamente con el mensaje de texto preparado.</p>
-        <label class="sw"><input type="checkbox" data-b="settings.digitalTicketEnabled" data-after="ticketMode" ${ticketEnabled ? 'checked' : ''}><span></span>Activar ticket digital (imagen)</label>
-        <p class="preview" id="ticketModeStatus">${ticketEnabled ? 'Activo: el cliente verá el ticket y podrá compartirlo junto con el mensaje.' : 'Desactivado: no se generará ni descargará una imagen; el botón abrirá WhatsApp con el texto listo para enviar.'}</p>
-        <label class="field">Mensaje de WhatsApp completamente editable<textarea data-b="settings.whatsappMessageTemplate" maxlength="5000" rows="16" spellcheck="true">${esc(messageTemplate)}</textarea><small>Puedes cambiar libremente el texto, los saltos de línea y el orden. Conserva los códigos entre llaves dobles para insertar los datos automáticamente.</small></label>
-        <div class="preview"><strong>Campos automáticos disponibles</strong><br>{{NOMBRE}} · {{TELEFONO}} · {{TELEFONO_BLOQUE}} · {{MODALIDAD}} · {{DIRECCION}} · {{SECTOR}} · {{REFERENCIA}} · {{DIRECCION_BLOQUE}} · {{PEDIDO}} · {{NOTAS}} · {{NOTAS_BLOQUE}} · {{CODIGO_PEDIDO}}<br><small>{{PEDIDO}} inserta todos los productos, cantidades, promociones, opciones y observaciones. Los bloques de teléfono, dirección y notas se ocultan cuando no aplican.</small></div>
-      </section>
-      <section class="card"><h2>Personaliza el ticket del pedido</h2><p class="card__intro">Esta es la imagen que acompañará el pedido cuando el ticket digital esté activado. Puedes cambiar los textos, el color principal y los datos que aparecen. Los precios se calculan automáticamente según el carrito y la tasa configurada.</p>
-        <div class="row2">${field('Nombre del negocio', 'settings.receipt.businessName', r.businessName, 'maxlength="60" data-after="ticketPreview"')}${field('Color principal', 'settings.receipt.accentColor', r.accentColor, 'type="color" data-after="ticketPreview"')}</div>
-        ${field('Título del ticket', 'settings.receipt.title', r.title, 'maxlength="70" data-after="ticketPreview"')}
-        <label class="field">Texto debajo del título<textarea data-b="settings.receipt.subtitle" data-after="ticketPreview" maxlength="140" rows="2">${esc(r.subtitle)}</textarea></label>
-        <div class="row2">${field('Encabezado de datos', 'settings.receipt.customerHeading', r.customerHeading, 'maxlength="60" data-after="ticketPreview"')}${field('Encabezado del pedido', 'settings.receipt.orderHeading', r.orderHeading, 'maxlength="60" data-after="ticketPreview"')}</div>
-        ${field('Encabezado del resumen', 'settings.receipt.summaryHeading', r.summaryHeading, 'maxlength="60" data-after="ticketPreview"')}
-        <div class="row2">${field('Etiqueta del subtotal', 'settings.receipt.subtotalLabel', r.subtotalLabel, 'maxlength="45" data-after="ticketPreview"')}${field('Etiqueta del delivery', 'settings.receipt.deliveryLabel', r.deliveryLabel, 'maxlength="45" data-after="ticketPreview"')}</div>
-        <div class="row2">${field('Etiqueta del total', 'settings.receipt.totalLabel', r.totalLabel, 'maxlength="45" data-after="ticketPreview"')}${field('Etiqueta del monto en Bs.', 'settings.receipt.vesLabel', r.vesLabel, 'maxlength="70" data-after="ticketPreview"')}</div>
-        <label class="field">Mensaje al pie del ticket<textarea data-b="settings.receipt.footerText" data-after="ticketPreview" maxlength="240" rows="3">${esc(r.footerText)}</textarea><small>Ejemplo: el monto final y el costo de entrega se confirman directamente por WhatsApp.</small></label>
-        ${field('Mensaje de agradecimiento', 'settings.receipt.thankYouText', r.thankYouText, 'maxlength="140" data-after="ticketPreview"')}
-      </section>
-      <section class="card"><h2>Qué información aparece</h2><p class="card__intro">Los datos esenciales y el detalle de productos se incluyen automáticamente. Activa o desactiva estos elementos según el diseño que prefieras.</p>
-        <div class="ticket-toggles">${toggles.map(([key, label]) => `<label class="sw"><input type="checkbox" data-b="settings.receipt.${key}" data-after="ticketPreview" ${r[key] ? 'checked' : ''}><span></span>${label}</label>`).join('')}</div>
-      </section>
-      <section class="card"><h2>Vista previa del diseño</h2><p class="card__intro">Ejemplo visual orientativo. El ticket real mostrará el nombre del cliente, productos, cantidades y precios de cada pedido.</p><div id="ticketAdminPreview">${adminTicketPreview()}</div></section>`;
-    },
     productos() {
-      return `<div class="toolbar"><input type="search" id="q" placeholder="Buscar producto" value="${esc(query)}" aria-label="Buscar producto"><button type="button" class="btn btn--red" data-act="addProduct">Agregar</button></div><div id="plist" style="display:grid;gap:12px">${productList()}</div>`;
+      return `<div class="toolbar"><input type="search" id="q" placeholder="Buscar producto" value="${esc(query)}" aria-label="Buscar producto"><div class="toolbar-actions"><button type="button" class="btn btn--red" data-act="addProduct">Agregar producto</button><button type="button" class="btn btn--small" data-act="addDulceProduct">Agregar postre Dulce</button></div></div><div id="plist" style="display:grid;gap:12px">${productList()}</div>`;
     },
     flyers() {
       const opts = link => {
@@ -136,12 +101,6 @@
     }
   };
 
-  function adminTicketPreview() {
-    const r = data.settings.receipt;
-    const accent = /^#[0-9a-fA-F]{6}$/.test(r.accentColor || '') ? r.accentColor : '#eb140c';
-    return `<div class="ticket-admin-preview" style="--ticket-accent:${esc(accent)}">${r.showLogo ? '<img src="/assets/brand/cochi-logo-red.png" alt="Cochi">' : ''}<strong>${esc(r.businessName)}</strong><b>${esc(r.title)}</b><p>${esc(r.subtitle)}</p><hr><small>${r.showDate ? '30/10/2026 · 8:30 p. m.' : ''}${r.showOrderCode ? ' · PEDIDO CO-3010-AB12' : ''}</small><h4>${esc(r.customerHeading)}</h4><div><span>Nombre</span><b>Nombre completo del cliente</b></div>${r.showPhone ? '<div><span>Teléfono</span><b>0412-0000000</b></div>' : ''}${r.showMode ? '<div><span>Modalidad</span><b>Entrega a domicilio</b></div>' : ''}${r.showAddress ? '<div><span>Dirección</span><b>Dirección del cliente</b></div>' : ''}${r.showSector ? '<div><span>Sector</span><b>Urbanización</b></div>' : ''}${r.showReference ? '<div><span>Referencia</span><b>Punto de referencia</b></div>' : ''}<hr><h4>${esc(r.orderHeading)}</h4><div class="ticket-admin-preview__item"><b>2 × Producto del menú</b><strong>$12.00</strong><small>${r.showItemOptions ? 'Opciones seleccionadas · Observaciones' : 'Detalle del producto'}</small></div>${r.showOrderNotes ? '<small>Nota adicional del pedido</small>' : ''}<hr><h4>${esc(r.summaryHeading)}</h4><div><span>${esc(r.subtotalLabel)}</span><b>$12.00</b></div><div><span>${esc(r.deliveryLabel)}</span><b>Por confirmar</b></div><div class="ticket-admin-preview__total"><span>${esc(r.totalLabel)}</span><b>$12.00</b></div>${r.showBs ? `<div><span>${esc(r.vesLabel)}</span><b>Bs. 1.200,00</b></div>` : ''}<hr><p>${esc(r.footerText)}</p><strong>${esc(r.thankYouText)}</strong></div>`;
-  }
-
   function productList() {
     const q = query.trim().toLowerCase();
     const rows = data.products.map((p, i) => ({ p, i })).filter(({ p }) => !q || `${p.name} ${p.category}`.toLowerCase().includes(q));
@@ -159,6 +118,7 @@
         ${field('Etiqueta (opcional)', `products.${i}.tag`, p.tag || '', 'maxlength="16" list="tagList" placeholder="Nuevo, Más pedido, Picante..."', 'Aparece sobre la foto del producto en el menú.')}<datalist id="tagList"><option value="Nuevo"><option value="Más pedido"><option value="Picante"><option value="Oferta"><option value="Solo domingos"></datalist>
         <label class="field">Descripción<textarea data-b="products.${i}.description" maxlength="420" rows="3">${esc(p.description)}</textarea></label>
         <label class="field">Categoría<input data-b="products.${i}.category" value="${esc(p.category)}" list="catList" maxlength="40"><datalist id="catList">${categories().map(c => `<option value="${esc(c)}">`).join('')}</datalist></label>
+        <label class="field">Marca<select data-b="products.${i}.brand" data-after="rerender"><option value="cochi" ${p.brand !== 'dulce' ? 'selected' : ''}>Cochi · Menú principal</option><option value="dulce" ${p.brand === 'dulce' ? 'selected' : ''}>Cochi Dulce · Postres</option></select><small>Los productos Cochi Dulce aparecen en su sección especial.</small></label>
         <div class="imgbox">${thumb(p.image)}<div class="imgbox__btns"><button type="button" class="btn btn--small" data-act="imgProduct" data-i="${i}">${p.image ? 'Cambiar foto' : 'Subir foto'}</button>${p.image ? `<button type="button" class="btn btn--danger" data-act="rmImg" data-i="${i}">Quitar foto</button>` : ''}</div></div>
         <div class="prow__bar">${sw(`products.${i}.featured`, p.featured, 'Destacado en favoritos')}${sw(`products.${i}.is_coming_soon`, p.is_coming_soon, 'Próximamente')}</div>
         <button type="button" class="btn btn--danger" data-act="delProduct" data-i="${i}">Eliminar producto</button></div>` : ''}</article>`;
@@ -209,6 +169,12 @@
       data.products.push({ id: slug, slug, name: name.trim().slice(0, 80), category: 'Adicionales', description: '', price_usd: 1, image: '', available: true, availability_days: [], is_visible: true, is_coming_soon: false, featured: false, tag: '', brand: 'cochi', sort_order: Math.max(0, ...data.products.map(p => Number(p.sort_order) || 0)) + 1, options: [] });
       openSlug = slug; query = ''; markDirty(); render(); toast('Producto agregado. Completa su categoría, precio y foto.');
     },
+    addDulceProduct() {
+      const name = prompt('Nombre del nuevo postre de Cochi Dulce:'); if (!name || !name.trim()) return;
+      let slug = slugify(name), n = 2; while (data.products.some(p => p.slug === slug)) slug = `${slugify(name)}-${n++}`;
+      data.products.push({ id: slug, slug, name: name.trim().slice(0, 80), category: 'Postres', description: '', price_usd: 0, image: '', available: false, availability_days: [], is_visible: false, is_coming_soon: false, featured: false, tag: 'Nuevo', brand: 'dulce', sort_order: Math.max(0, ...data.products.map(p => Number(p.sort_order) || 0)) + 1, options: [] });
+      openSlug = slug; query = 'Postres'; markDirty(); render(); toast('Postre creado como borrador. Completa precio, descripción y foto antes de hacerlo visible.');
+    },
     editProduct: el => { openSlug = openSlug === el.dataset.slug ? null : el.dataset.slug; $('#plist').innerHTML = productList(); },
     async imgProduct(el) { const url = await uploadImage(1000); if (url) { data.products[el.dataset.i].image = url; markDirty(); $('#plist').innerHTML = productList(); } },
     rmImg(el) { data.products[el.dataset.i].image = ''; markDirty(); $('#plist').innerHTML = productList(); },
@@ -227,9 +193,7 @@
   };
   const AFTER = {
     bs() { document.querySelectorAll('[data-bs]').forEach(n => { n.textContent = `Bs. ${bs(data.products[n.dataset.bs].price_usd)}`; }); const p = $('#ratePreview'); const s = data.products.find(x => x.slug === 'shawarma-cesar') || data.products[0]; if (p && s) p.textContent = `${s.name}: $${money(s.price_usd)} = Bs. ${bs(s.price_usd)}`; },
-    rerender() { render(); },
-    ticketPreview() { const node = $('#ticketAdminPreview'); if (node) node.innerHTML = adminTicketPreview(); },
-    ticketMode() { const node = $('#ticketModeStatus'); if (node) node.textContent = data.settings.digitalTicketEnabled !== false ? 'Activo: el cliente verá el ticket y podrá compartirlo junto con el mensaje.' : 'Desactivado: no se generará ni descargará una imagen; el botón abrirá WhatsApp con el texto listo para enviar.'; }
+    rerender() { render(); }
   };
   const CHANGES = {
     flyerLink(el) { const f = data.flyers[el.dataset.i]; f.link = el.value === '__url' ? 'https://' : el.value; if (!el.value) f.linkLabel = ''; markDirty(); render(); },
@@ -251,9 +215,11 @@
     else if (kind === 'nullable') value = el.value === '' ? null : Number(el.value);
     else value = el.value;
     setPath(el.dataset.b, value); markDirty();
-    if (el.dataset.after && (el.tagName !== 'INPUT' || el.type === 'checkbox' || el.dataset.after === 'bs' || el.dataset.after === 'ticketPreview')) AFTER[el.dataset.after]();
+    if (el.dataset.after && (el.tagName !== 'INPUT' || el.type === 'checkbox' || el.dataset.after === 'bs')) AFTER[el.dataset.after]();
   });
   document.addEventListener('change', event => {
+    const boundSelect = event.target.closest('select[data-b]');
+    if (boundSelect) { setPath(boundSelect.dataset.b, boundSelect.value); markDirty(); }
     const el = event.target.closest('[data-act-change]'); if (el) CHANGES[el.dataset.actChange](el);
     const after = event.target.closest('[data-after="rerender"]'); if (after) render();
   });
@@ -274,6 +240,26 @@
     $('#app').hidden = true; $('#login').hidden = false;
     const node = $('#loginMsg'); node.hidden = !message; node.textContent = message;
   }
+  function migrateDulceCatalog() {
+    const before = data.products.length;
+    data.products = data.products.filter(product => !(product.brand === 'dulce' && (product.slug === 'brownies-proximamente' || String(product.name || '').trim().toLocaleLowerCase('es') === 'brownies')));
+    let changed = data.products.length !== before;
+    let surprise = data.products.find(product => product.slug === 'sorpresa-dulce-proximamente');
+    if (!surprise) {
+      surprise = { id: 'sorpresa-dulce-proximamente', slug: 'sorpresa-dulce-proximamente', name: 'Una sorpresa dulce', category: 'Postres', description: 'Estamos preparando algo especial para tu próximo antojo.', price_usd: 0, image: '', available: false, availability_days: [], is_visible: true, is_coming_soon: true, featured: false, tag: '', brand: 'dulce', sort_order: Math.max(0, ...data.products.map(p => Number(p.sort_order) || 0)) + 1, options: [] };
+      data.products.push(surprise); changed = true;
+    } else {
+      if (surprise.brand !== 'dulce') { surprise.brand = 'dulce'; changed = true; }
+      if (surprise.category !== 'Postres') { surprise.category = 'Postres'; changed = true; }
+      if (surprise.is_coming_soon !== true) { surprise.is_coming_soon = true; changed = true; }
+      if (surprise.available !== false) { surprise.available = false; changed = true; }
+      if (surprise.is_visible !== true) { surprise.is_visible = true; changed = true; }
+      if (Number(surprise.price_usd) !== 0) { surprise.price_usd = 0; changed = true; }
+      if (!surprise.description) { surprise.description = 'Estamos preparando algo especial para tu próximo antojo.'; changed = true; }
+    }
+    if (changed) markDirty();
+  }
+
   async function loadData() {
     const { content, storage: mode } = await api('content');
     storage = mode; fromDefaults = !content;
@@ -283,10 +269,7 @@
       data = { settings, products, ...extras };
     }
     ['products', 'flyers', 'testimonials', 'upsells', 'announcements'].forEach(k => { if (!Array.isArray(data[k])) data[k] = []; });
-    data.settings.receipt = { ...defaultReceipt, ...(data.settings.receipt || {}) };
-    data.settings.digitalTicketEnabled = data.settings.digitalTicketEnabled !== false;
-    data.settings.whatsappMessageTemplate = data.settings.whatsappMessageTemplate || defaultWhatsAppMessageTemplate;
-    $('#login').hidden = true; $('#app').hidden = false; markDirty(false); render();
+    $('#login').hidden = true; $('#app').hidden = false; markDirty(false); migrateDulceCatalog(); render();
   }
   $('#loginForm').addEventListener('submit', async event => {
     event.preventDefault(); const button = $('#loginBtn'); button.disabled = true; button.textContent = 'Entrando...';
