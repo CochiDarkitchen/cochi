@@ -75,7 +75,3 @@ main{padding:12px 16px 20px;max-width:760px;margin:0 auto;display:grid;gap:14px}
 .chip--on{background:#d8f0df;color:#14532d}.chip--soon{background:#fff3c9;color:#5c4400}.chip--off{background:#fde4e2;color:#8c0b06}
 :where(a,button,input,select,textarea):focus-visible{outline:3px solid var(--ink);outline-offset:3px;box-shadow:0 0 0 6px var(--paper)}
 .savebar :focus-visible,.login :focus-visible{outline-color:#fff;box-shadow:0 0 0 6px var(--ink)}
-
-.toolbar-actions{display:flex;gap:8px;flex-wrap:wrap}
-.toolbar-actions .btn{white-space:nowrap}
-@media(max-width:600px){.toolbar{align-items:stretch;flex-direction:column}.toolbar-actions{display:grid;grid-template-columns:1fr 1fr}.toolbar-actions .btn{justify-content:center;padding-inline:8px;font-size:12px}}

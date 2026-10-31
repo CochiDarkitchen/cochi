@@ -240,40 +240,12 @@
     prepReveal($$('.product-card', target));
   }
   function renderDulceFeatured() {
-    const target = $('#dulceProducts');
-    if (!target) return;
-    const sweetProducts = products
-      .filter(product => product.brand === 'dulce' && product.is_visible)
-      .sort((a, b) => a.sort_order - b.sort_order);
-    target.hidden = sweetProducts.length === 0;
-    target.innerHTML = sweetProducts.map(product => {
-      const availability = productAvailability(product);
-      const photo = safeAssetPath(product.image);
-      const picture = photo
-        ? `<img class="dulce-product__photo" src="${escapeHtml(photo)}" alt="Fotografía de ${escapeHtml(product.name)}" loading="lazy" decoding="async" width="124" height="124">`
-        : `<img src="/assets/brand/dulce-isotipo-chocolate.png" alt="" width="42" height="45">`;
-      const label = product.is_coming_soon ? 'UN NUEVO ANTOJO' : (product.tag ? escapeHtml(product.tag.toUpperCase()) : 'COCHI DULCE');
-      const price = product.is_coming_soon
-        ? '<b class="dulce-product__soon">MUY PRONTO</b>'
-        : `<b>${currencyUSD(product.price_usd)}${getConvertedPrice(product.price_usd) !== null ? ' · ' + currencyVES(getConvertedPrice(product.price_usd)) : ''}</b>`;
-      const action = availability.canOrder
-        ? `<button class="round-add round-add--dulce" type="button" data-product-slug="${escapeHtml(product.slug)}" aria-label="Elegir ${escapeHtml(product.name)}">+</button>`
-        : `<span class="dulce-product__status">${product.is_coming_soon ? 'PRÓXIMAMENTE' : escapeHtml(availability.label || 'NO DISPONIBLE')}</span>`;
-      return `<article class="dulce-product${product.is_coming_soon ? ' dulce-product--soon' : ''}"><div class="dulce-product__thumb">${picture}</div><div class="dulce-product__text"><span>${label}</span><strong>${escapeHtml(product.name)}</strong><small>${escapeHtml(product.description)}</small>${price}</div>${action}</article>`;
-    }).join('');
-
-    const firstReady = sweetProducts.find(product => productAvailability(product).canOrder);
-    const orderButton = $('#dulceOrderButton');
-    if (orderButton) {
-      if (firstReady) {
-        orderButton.hidden = false;
-        orderButton.dataset.productSlug = firstReady.slug;
-        orderButton.disabled = false;
-      } else {
-        orderButton.hidden = true;
-        orderButton.removeAttribute('data-product-slug');
-      }
+    const product = products.find(p => p.slug === 'marquesa-chocolate' && p.is_visible) || products.find(p => p.brand === 'dulce' && !p.is_coming_soon && p.is_visible);
+    if (!product) {
+      $('#dulceFeatured').hidden = true;
+      return;
     }
+    $('#dulceFeatured').innerHTML = `<div class="dulce-product__thumb"><img src="/assets/brand/dulce-isotipo-chocolate.png" alt="" width="58" height="62"></div><div class="dulce-product__text"><span>EL CLÁSICO DULCE</span><strong>${escapeHtml(product.name)}</strong><small>${escapeHtml(product.description)}</small><b>${currencyUSD(product.price_usd)}${getConvertedPrice(product.price_usd) !== null ? ' · ' + currencyVES(getConvertedPrice(product.price_usd)) : ''}</b></div><button class="round-add round-add--dulce" type="button" data-product-slug="${escapeHtml(product.slug)}" aria-label="Elegir ${escapeHtml(product.name)}">+</button>`;
   }
 
   function lineKey(slug, selections, note) {
@@ -642,7 +614,12 @@
     error.hidden = true;
     return { ok:true, data };
   }
-  function buildWhatsAppMessage(data) {
+  function newOrderId() {
+    const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Caracas', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
+    const v = Object.fromEntries(parts.map(part => [part.type, part.value]));
+    return `CH-${v.month}${v.day}-${Math.floor(1000 + Math.random() * 9000)}`;
+  }
+  function buildWhatsAppMessage(data, orderId = newOrderId()) {
     const fullName = String(data.get('customerName') || '').trim();
     const phone = String(data.get('customerPhone') || '').trim();
     const mode = String(data.get('orderMode') || getSelectedMode());
@@ -651,29 +628,41 @@
     const reference = String(data.get('reference') || '').trim();
     const orderNotes = String(data.get('orderNotes') || '').trim();
     const modeLabel = mode === 'delivery' ? 'Entrega a domicilio' : mode === 'pickup' ? 'Retiro' : mode;
-    const rows = ['¡Hola, Cochi! Quiero consultar y coordinar este pedido.', '', '*DATOS DEL CLIENTE*', `Nombre: ${fullName}`];
+    const when = new Intl.DateTimeFormat('es-VE', { timeZone: 'America/Caracas', weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date());
+    const line = '------------------------------';
+    const rows = [`*PEDIDO COCHI Nº ${orderId}*`, when, line, '', '*CLIENTE*', `Nombre: ${fullName}`];
     if (phone) rows.push(`Teléfono: ${phone}`);
     rows.push(`Modalidad: ${modeLabel}`);
     if (mode === 'delivery') {
       if (address) rows.push(`Dirección: ${address}`);
-      if (sector) rows.push(`Sector / urbanización: ${sector}`);
+      if (sector) rows.push(`Sector: ${sector}`);
       if (reference) rows.push(`Referencia: ${reference}`);
     }
-    rows.push('', '*MI PEDIDO*');
-    cart.forEach((line, index) => {
-      const product = productFromCatalog(line.slug);
+    rows.push('', line, '*DETALLE DEL PEDIDO*', '');
+    let n = 0;
+    cart.forEach(item => {
+      const product = productFromCatalog(item.slug);
       if (!product) return;
-      rows.push(`${index + 1}. ${product.name}`);
-      rows.push(`   Cantidad: ${line.quantity}`);
-      if (line.promo) { const promoRule = upsellRule(line.promo); if (promoRule) rows.push(`   Promo: ${promoRule.title}`); }
-      const options = line.selections.map(selection => `${selection.groupName}: ${selection.choiceLabel}${selection.quantity > 1 ? ` x${selection.quantity}` : ''}`);
-      if (options.length) rows.push(`   Opciones: ${options.join('; ')}`);
-      if (line.note.trim()) rows.push(`   Observaciones: ${line.note.trim()}`);
-      rows.push('');
+      n += 1;
+      const subtotal = lineUnitPrice(item) * item.quantity;
+      const promoRule = item.promo ? upsellRule(item.promo) : null;
+      rows.push(`${n}. ${item.quantity} x ${product.name}${promoRule ? ' (promo)' : ''} = ${currencyUSD(subtotal)}`);
+      const options = item.selections.map(sel => `${sel.groupName}: ${sel.choiceLabel}${sel.quantity > 1 ? ` x${sel.quantity}` : ''}`);
+      if (options.length) rows.push(`   ${options.join(' | ')}`);
+      if (item.note.trim()) rows.push(`   Nota: ${item.note.trim()}`);
     });
-    rows.push('*CONFIRMACIÓN Y PAGO*', 'El monto final, la disponibilidad, el costo de entrega y los datos de pago se confirman directamente por este chat.', 'La preparación del pedido comienza únicamente después de que Cochi reciba el depósito acordado.');
+    const subtotal = cartProductTotal();
+    const fee = cartFee(mode);
+    const total = cartGrandTotal(mode);
+    const units = cart.reduce((sum, item) => sum + item.quantity, 0);
+    rows.push('', line, '*RESUMEN*', `Productos (${units} uds.): ${currencyUSD(subtotal)}`);
+    if (mode === 'delivery') rows.push(`Entrega: ${fee === null ? 'por confirmar' : currencyUSD(fee)}`);
+    rows.push(`*TOTAL ${fee === null && mode === 'delivery' ? 'ESTIMADO (sin entrega)' : 'ESTIMADO'}: ${currencyUSD(total)}*`);
+    const ves = getConvertedPrice(total);
+    if (ves !== null && rate) rows.push(`Referencia en Bs.: ${currencyVES(ves)} (tasa ${currencyVES(rate.usdVES)} del ${formatDate(rate.effectiveDate)})`);
+    rows.push('', line, '*CONFIRMACIÓN Y PAGO*', 'El monto final, la disponibilidad, el costo de entrega y los datos de pago se confirman directamente por este chat.', 'La preparación del pedido comienza únicamente después de que Cochi reciba el depósito acordado.');
     if (orderNotes) rows.push('', '*NOTAS ADICIONALES*', orderNotes);
-    rows.push('', 'Cochi recibe pedidos únicamente de viernes a domingo.', '¡Gracias!');
+    rows.push('', 'Cochi recibe pedidos únicamente de viernes a domingo.', '¡Gracias por pedir en Cochi!');
     return rows.join('\n');
   }
   function handleCheckoutSubmit(event) {
@@ -690,7 +679,7 @@
       $('#checkoutError').hidden = false;
       return;
     }
-    pendingOrder = { data: validation.data, number };
+    pendingOrder = { data: validation.data, number, orderId: newOrderId() };
     showConfirm();
   }
   function showConfirm() {
@@ -715,7 +704,7 @@
   }
   function sendPendingOrder() {
     if (!pendingOrder) return;
-    const url = `https://wa.me/${pendingOrder.number}?text=${encodeURIComponent(buildWhatsAppMessage(pendingOrder.data))}`;
+    const url = `https://wa.me/${pendingOrder.number}?text=${encodeURIComponent(buildWhatsAppMessage(pendingOrder.data, pendingOrder.orderId))}`;
     $('#confirmFallbackLink').href = url; $('#confirmFallback').hidden = false;
     const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.matchMedia('(pointer: coarse)').matches;
     if (isMobile) { window.location.assign(url); return; }
@@ -763,8 +752,7 @@
     catch { localProducts = []; }
     products = (Array.isArray(localProducts) ? localProducts : [])
       .map(normalizeProduct)
-      // Oculta el registro antiguo de brownies incluso antes de guardar la migración desde Admin.
-      .filter(product => product.slug && product.name && !(product.brand === 'dulce' && (product.slug === 'brownies-proximamente' || product.name.trim().toLocaleLowerCase('es') === 'brownies')))
+      .filter(product => product.slug && product.name)
       .sort((a,b) => a.sort_order - b.sort_order);
   }
 

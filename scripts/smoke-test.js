@@ -26,7 +26,7 @@ async function waitForServer(url, child) {
 }
 
 (async () => {
-  assert.equal(catalog.length, 29, 'El menú debe contener 29 artículos después de retirar los brownies.');
+  assert.equal(catalog.length, 30, 'El menú debe contener 30 artículos.');
   const slugs = catalog.map(p => p.slug);
   assert.equal(new Set(slugs).size, catalog.length, 'No deben repetirse los slugs.');
   for (const p of catalog) {
@@ -41,10 +41,7 @@ async function waitForServer(url, child) {
   ok(`Catálogo de ${catalog.length} productos válido y fácil de editar.`);
 
   const soon = catalog.filter(p => p.is_coming_soon);
-  assert.deepEqual(soon.map(p => p.slug).sort(), ['sorpresa-dulce-proximamente']);
-  assert.ok(!catalog.some(p => p.brand === 'dulce' && p.name.trim().toLowerCase() === 'brownies'), 'Brownies no debe seguir en el catálogo.');
-  const surprise = catalog.find(p => p.slug === 'sorpresa-dulce-proximamente');
-  assert.ok(surprise && surprise.brand === 'dulce' && surprise.is_visible && surprise.is_coming_soon && surprise.available === false, 'La sorpresa debe quedar visible como próximamente y no se debe poder pedir.');
+  assert.deepEqual(soon.map(p => p.slug).sort(), ['brownies-proximamente', 'sorpresa-dulce-proximamente']);
   const sunday = catalog.filter(p => p.category === 'Pollo asado');
   assert.equal(sunday.length, 2);
   assert.ok(sunday.every(p => JSON.stringify(p.availability_days) === '[0]'));
@@ -57,18 +54,14 @@ async function waitForServer(url, child) {
   assert.ok(html.includes('La preparación comienza únicamente después de recibir el depósito acordado.'), 'La web debe comunicar cuándo comienza la preparación.');
   const messageBuilder = app.slice(app.indexOf('function buildWhatsAppMessage'), app.indexOf('function handleCheckoutSubmit'));
   assert.ok(messageBuilder.includes('Monto final') || messageBuilder.includes('monto final'));
-  assert.ok(!messageBuilder.includes('currencyUSD') && !messageBuilder.includes('currencyVES') && !messageBuilder.includes('cartProductTotal'), 'WhatsApp no debe incluir montos calculados.');
+  assert.ok(messageBuilder.includes('currencyUSD') && messageBuilder.includes('cartProductTotal') && messageBuilder.includes('TOTAL'), 'La factura de WhatsApp debe incluir el detalle y el total estimado.');
   assert.ok(html.includes('TRABAJAMOS DE VIERNES A DOMINGO') && html.includes('orderScheduleNote'));
-  assert.ok(html.includes('id="dulceProducts"') && !html.includes('Brownies'), 'Cochi Dulce debe renderizar su lista dinámica sin anunciar brownies.');
-  assert.ok(app.includes('dulce-product__photo') && app.includes('product.image'), 'La sección Cochi Dulce debe utilizar la fotografía guardada en cada producto.');
-  const adminJs = fs.readFileSync(path.join(publicDir, 'admin/admin.js'), 'utf8');
-  assert.ok(adminJs.includes('addDulceProduct') && adminJs.includes('migrateDulceCatalog'), 'El panel debe poder crear postres y migrar el registro antiguo de brownies.');
   assert.ok(!html.includes('/admin.html') && !app.includes('supabaseUrl') && !app.includes('/api/bcv') && !app.includes('/api/config'), 'La experiencia pública no debe depender de Admin, Supabase ni APIs de tasa.');
   const htmlIds = new Set([...html.matchAll(/\bid="([^"]+)"/g)].map(match => match[1]));
   const appStaticIds = new Set([...app.matchAll(/\$\('#([A-Za-z][A-Za-z0-9_-]*)'/g)].map(match => match[1]));
   const dynamicIds = new Set(['modalQtyMinus', 'modalQtyValue', 'modalQtyPlus', 'saveProductToCart', 'productDialogError', 'productNote', 'upsellCheck']);
   assert.deepEqual([...appStaticIds].filter(id => !htmlIds.has(id) && !dynamicIds.has(id)), [], 'El frontend no debe buscar elementos inexistentes.');
-  ok('Tasa manual, WhatsApp sin precios, depósito antes de preparar, horario y referencias HTML validados.');
+  ok('Tasa manual, factura de WhatsApp con detalle y total, depósito antes de preparar, horario y referencias HTML validados.');
 
   const port = 4184;
   const child = spawn(process.execPath, ['scripts/dev-server.js'], { cwd: root, env: { ...process.env, PORT: String(port), ADMIN_EMAIL: 'dueno@cochi.test', ADMIN_PASSWORD: 'clave-de-prueba-123', SESSION_SECRET: 'secreto-de-prueba-largo-123', COCHI_STORAGE_DIR: fs.mkdtempSync(path.join(os.tmpdir(), 'cochi-test-')) }, stdio: 'ignore' });

@@ -53,7 +53,7 @@
         <label class="field">Datos para el depósito (opcional)<textarea data-b="settings.paymentInfo" maxlength="500" rows="4">${esc(s.paymentInfo)}</textarea><small>Se muestran en la pantalla de confirmación, con un botón para copiarlos. Por ejemplo: banco, cuenta, titular y cédula, o Pago Móvil.</small></label></section>`;
     },
     productos() {
-      return `<div class="toolbar"><input type="search" id="q" placeholder="Buscar producto" value="${esc(query)}" aria-label="Buscar producto"><div class="toolbar-actions"><button type="button" class="btn btn--red" data-act="addProduct">Agregar producto</button><button type="button" class="btn btn--small" data-act="addDulceProduct">Agregar postre Dulce</button></div></div><div id="plist" style="display:grid;gap:12px">${productList()}</div>`;
+      return `<div class="toolbar"><input type="search" id="q" placeholder="Buscar producto" value="${esc(query)}" aria-label="Buscar producto"><button type="button" class="btn btn--red" data-act="addProduct">Agregar</button></div><div id="plist" style="display:grid;gap:12px">${productList()}</div>`;
     },
     flyers() {
       const opts = link => {
@@ -118,7 +118,6 @@
         ${field('Etiqueta (opcional)', `products.${i}.tag`, p.tag || '', 'maxlength="16" list="tagList" placeholder="Nuevo, Más pedido, Picante..."', 'Aparece sobre la foto del producto en el menú.')}<datalist id="tagList"><option value="Nuevo"><option value="Más pedido"><option value="Picante"><option value="Oferta"><option value="Solo domingos"></datalist>
         <label class="field">Descripción<textarea data-b="products.${i}.description" maxlength="420" rows="3">${esc(p.description)}</textarea></label>
         <label class="field">Categoría<input data-b="products.${i}.category" value="${esc(p.category)}" list="catList" maxlength="40"><datalist id="catList">${categories().map(c => `<option value="${esc(c)}">`).join('')}</datalist></label>
-        <label class="field">Marca<select data-b="products.${i}.brand" data-after="rerender"><option value="cochi" ${p.brand !== 'dulce' ? 'selected' : ''}>Cochi · Menú principal</option><option value="dulce" ${p.brand === 'dulce' ? 'selected' : ''}>Cochi Dulce · Postres</option></select><small>Los productos Cochi Dulce aparecen en su sección especial.</small></label>
         <div class="imgbox">${thumb(p.image)}<div class="imgbox__btns"><button type="button" class="btn btn--small" data-act="imgProduct" data-i="${i}">${p.image ? 'Cambiar foto' : 'Subir foto'}</button>${p.image ? `<button type="button" class="btn btn--danger" data-act="rmImg" data-i="${i}">Quitar foto</button>` : ''}</div></div>
         <div class="prow__bar">${sw(`products.${i}.featured`, p.featured, 'Destacado en favoritos')}${sw(`products.${i}.is_coming_soon`, p.is_coming_soon, 'Próximamente')}</div>
         <button type="button" class="btn btn--danger" data-act="delProduct" data-i="${i}">Eliminar producto</button></div>` : ''}</article>`;
@@ -169,12 +168,6 @@
       data.products.push({ id: slug, slug, name: name.trim().slice(0, 80), category: 'Adicionales', description: '', price_usd: 1, image: '', available: true, availability_days: [], is_visible: true, is_coming_soon: false, featured: false, tag: '', brand: 'cochi', sort_order: Math.max(0, ...data.products.map(p => Number(p.sort_order) || 0)) + 1, options: [] });
       openSlug = slug; query = ''; markDirty(); render(); toast('Producto agregado. Completa su categoría, precio y foto.');
     },
-    addDulceProduct() {
-      const name = prompt('Nombre del nuevo postre de Cochi Dulce:'); if (!name || !name.trim()) return;
-      let slug = slugify(name), n = 2; while (data.products.some(p => p.slug === slug)) slug = `${slugify(name)}-${n++}`;
-      data.products.push({ id: slug, slug, name: name.trim().slice(0, 80), category: 'Postres', description: '', price_usd: 0, image: '', available: false, availability_days: [], is_visible: false, is_coming_soon: false, featured: false, tag: 'Nuevo', brand: 'dulce', sort_order: Math.max(0, ...data.products.map(p => Number(p.sort_order) || 0)) + 1, options: [] });
-      openSlug = slug; query = 'Postres'; markDirty(); render(); toast('Postre creado como borrador. Completa precio, descripción y foto antes de hacerlo visible.');
-    },
     editProduct: el => { openSlug = openSlug === el.dataset.slug ? null : el.dataset.slug; $('#plist').innerHTML = productList(); },
     async imgProduct(el) { const url = await uploadImage(1000); if (url) { data.products[el.dataset.i].image = url; markDirty(); $('#plist').innerHTML = productList(); } },
     rmImg(el) { data.products[el.dataset.i].image = ''; markDirty(); $('#plist').innerHTML = productList(); },
@@ -218,8 +211,6 @@
     if (el.dataset.after && (el.tagName !== 'INPUT' || el.type === 'checkbox' || el.dataset.after === 'bs')) AFTER[el.dataset.after]();
   });
   document.addEventListener('change', event => {
-    const boundSelect = event.target.closest('select[data-b]');
-    if (boundSelect) { setPath(boundSelect.dataset.b, boundSelect.value); markDirty(); }
     const el = event.target.closest('[data-act-change]'); if (el) CHANGES[el.dataset.actChange](el);
     const after = event.target.closest('[data-after="rerender"]'); if (after) render();
   });
@@ -240,26 +231,6 @@
     $('#app').hidden = true; $('#login').hidden = false;
     const node = $('#loginMsg'); node.hidden = !message; node.textContent = message;
   }
-  function migrateDulceCatalog() {
-    const before = data.products.length;
-    data.products = data.products.filter(product => !(product.brand === 'dulce' && (product.slug === 'brownies-proximamente' || String(product.name || '').trim().toLocaleLowerCase('es') === 'brownies')));
-    let changed = data.products.length !== before;
-    let surprise = data.products.find(product => product.slug === 'sorpresa-dulce-proximamente');
-    if (!surprise) {
-      surprise = { id: 'sorpresa-dulce-proximamente', slug: 'sorpresa-dulce-proximamente', name: 'Una sorpresa dulce', category: 'Postres', description: 'Estamos preparando algo especial para tu próximo antojo.', price_usd: 0, image: '', available: false, availability_days: [], is_visible: true, is_coming_soon: true, featured: false, tag: '', brand: 'dulce', sort_order: Math.max(0, ...data.products.map(p => Number(p.sort_order) || 0)) + 1, options: [] };
-      data.products.push(surprise); changed = true;
-    } else {
-      if (surprise.brand !== 'dulce') { surprise.brand = 'dulce'; changed = true; }
-      if (surprise.category !== 'Postres') { surprise.category = 'Postres'; changed = true; }
-      if (surprise.is_coming_soon !== true) { surprise.is_coming_soon = true; changed = true; }
-      if (surprise.available !== false) { surprise.available = false; changed = true; }
-      if (surprise.is_visible !== true) { surprise.is_visible = true; changed = true; }
-      if (Number(surprise.price_usd) !== 0) { surprise.price_usd = 0; changed = true; }
-      if (!surprise.description) { surprise.description = 'Estamos preparando algo especial para tu próximo antojo.'; changed = true; }
-    }
-    if (changed) markDirty();
-  }
-
   async function loadData() {
     const { content, storage: mode } = await api('content');
     storage = mode; fromDefaults = !content;
@@ -269,7 +240,7 @@
       data = { settings, products, ...extras };
     }
     ['products', 'flyers', 'testimonials', 'upsells', 'announcements'].forEach(k => { if (!Array.isArray(data[k])) data[k] = []; });
-    $('#login').hidden = true; $('#app').hidden = false; markDirty(false); migrateDulceCatalog(); render();
+    $('#login').hidden = true; $('#app').hidden = false; markDirty(false); render();
   }
   $('#loginForm').addEventListener('submit', async event => {
     event.preventDefault(); const button = $('#loginBtn'); button.disabled = true; button.textContent = 'Entrando...';
