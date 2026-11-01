@@ -49,7 +49,7 @@ async function waitForServer(url, child) {
   assert.ok(Number(settings.usdToVes) > 0, 'La tasa manual debe ser mayor que cero.');
   assert.match(settings.exchangeRateDate, /^\d{4}-\d{2}-\d{2}$/, 'La fecha de tasa debe usar formato AAAA-MM-DD.');
   assert.ok(settings.orderModes.includes('delivery') && settings.orderModes.includes('pickup'));
-  assert.ok(app.includes("['Fri', 'Sat', 'Sun'].includes(weekday)"), 'Los pedidos solo continúan viernes, sábado y domingo.');
+  assert.ok(app.includes('function isOrderDay') && app.includes('scheduleList') && app.includes('ordersPaused'), 'Los pedidos dependen del horario editable del panel.');
   assert.ok(app.includes('La preparación del pedido comienza únicamente después de que Cochi reciba el depósito acordado.'), 'WhatsApp debe comunicar la condición del depósito.');
   assert.ok(html.includes('La preparación comienza únicamente después de recibir el depósito acordado.'), 'La web debe comunicar cuándo comienza la preparación.');
   const messageBuilder = app.slice(app.indexOf('function buildWhatsAppMessage'), app.indexOf('function handleCheckoutSubmit'));

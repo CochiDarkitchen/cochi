@@ -2,7 +2,7 @@
   'use strict';
   const $ = (s, r = document) => r.querySelector(s);
   const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const TABS = [['tasa', 'Tasa y datos'], ['productos', 'Productos'], ['flyers', 'Flyers'], ['comentarios', 'Comentarios'], ['ofertas', 'Ofertas y avisos'], ['cupones', 'Cupones']];
+  const TABS = [['tasa', 'Tasa y datos'], ['horario', 'Horario'], ['productos', 'Productos'], ['flyers', 'Flyers'], ['comentarios', 'Comentarios'], ['ofertas', 'Ofertas y avisos'], ['cupones', 'Cupones']];
   let data = null, tab = 'tasa', dirty = false, openSlug = null, query = '', storage = 'file', fromDefaults = false, toastTimer = null;
 
   async function api(path, options = {}) {
@@ -95,6 +95,12 @@
         ${dates(`cp.coupons.${i}`, c)}<p class="preview">Usos hasta ahora: ${c.uses || 0}${c.max_uses ? ` de ${c.max_uses}` : ''}.</p></div>
         <div class="item__bar">${sw(`cp.coupons.${i}.active`, c.active !== false, 'Activo')}${sw(`cp.coupons.${i}.per_customer`, Boolean(c.per_customer), 'Un uso por cliente')}<button type="button" class="btn btn--small" data-act="genCode" data-i="${i}">Generar código</button><button type="button" class="btn btn--danger" data-act="delCoupon" data-i="${i}">Eliminar</button></div></article>`).join('');
       return `<section class="card"><h2>Cupones de descuento</h2><p class="card__intro">Función de prueba. El interruptor enciende o apaga los cupones en toda la tienda. Un uso se cuenta cuando el cliente pulsa "Enviar por WhatsApp". Recuerda pulsar "Guardar cambios".</p>${sw('cp.enabled', cp.enabled, 'Cupones activados en la tienda')}<br><button type="button" class="btn btn--red" data-act="addCoupon">Crear cupón</button></section>${items}`;
+    },
+    horario() {
+      const s = data.settings, names = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+      const rows = [1, 2, 3, 4, 5, 6, 0].map(d => { const i = s.schedule.findIndex(x => x.day === d), r = s.schedule[i];
+        return `<article class="item"><div class="item__fields"><h3>${names[d]}</h3><div class="row2">${field('Abre', `settings.schedule.${i}.from`, r.from, 'type="time"')}${field('Cierra', `settings.schedule.${i}.to`, r.to, 'type="time"')}</div></div><div class="item__bar">${sw(`settings.schedule.${i}.open`, r.open, 'Recibe pedidos este día')}</div></article>`; }).join('');
+      return `<section class="card"><h2>Horario de pedidos</h2><p class="card__intro">Los clientes solo pueden enviar su pedido dentro de este horario (hora de Caracas). "00:00 a 23:59" significa todo el día. Si cierras después de medianoche, pon una hora menor que la de apertura (ej. abre 18:00, cierra 01:00). Los textos del sitio y de la factura se actualizan solos.</p>${sw('settings.ordersPaused', Boolean(s.ordersPaused), 'Pausar pedidos ahora (cierre temporal)')}</section>${rows}`;
     },
     ofertas() {
       const rules = data.upsells.map((u, i) => {
@@ -257,6 +263,9 @@
       data = { settings, products, ...extras };
     }
     ['products', 'flyers', 'testimonials', 'upsells', 'announcements'].forEach(k => { if (!Array.isArray(data[k])) data[k] = []; });
+    const base = [0, 1, 2, 3, 4, 5, 6].map(day => ({ day, open: [5, 6, 0].includes(day), from: '00:00', to: '23:59' }));
+    data.settings.schedule = base.map(b => ({ ...b, ...((data.settings.schedule || []).find(x => x.day === b.day) || {}) }));
+    data.settings.ordersPaused = Boolean(data.settings.ordersPaused);
     data.cp = await api('coupons').then(r => r.coupons).catch(() => ({ enabled: false, coupons: [] }));
     $('#login').hidden = true; $('#app').hidden = false; markDirty(false); render();
   }

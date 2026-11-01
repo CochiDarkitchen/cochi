@@ -63,19 +63,43 @@
     const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
     return `${values.year}-${values.month}-${values.day}`;
   }
+  const DAY_NAMES = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+  const DEFAULT_SCHEDULE = [0, 1, 2, 3, 4, 5, 6].map(day => ({ day, open: [5, 6, 0].includes(day), from: '00:00', to: '23:59' }));
+  const scheduleList = () => (Array.isArray(config.schedule) && config.schedule.length === 7 ? config.schedule : DEFAULT_SCHEDULE);
+  const endOf = d => (d.to === '23:59' ? '24:00' : d.to);
+  function fmtHour(hhmm) { const [h, m] = hhmm.split(':').map(Number); return new Intl.DateTimeFormat('es-VE', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'UTC' }).format(new Date(Date.UTC(2000, 0, 1, h, m))); }
   function isOrderDay(date = new Date()) {
-    const weekday = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Caracas', weekday: 'short' }).format(date);
-    return ['Fri', 'Sat', 'Sun'].includes(weekday);
+    if (config.ordersPaused) return false;
+    const p = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: 'America/Caracas', weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(date).map(x => [x.type, x.value]));
+    const day = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(p.weekday), time = `${p.hour}:${p.minute}`;
+    const list = scheduleList(), today = list.find(d => d.day === day), prev = list.find(d => d.day === (day + 6) % 7);
+    const inToday = today && today.open && (today.from < endOf(today) ? time >= today.from && time < endOf(today) : time >= today.from);
+    const inPrev = prev && prev.open && endOf(prev) <= prev.from && time < endOf(prev);
+    return Boolean(inToday || inPrev);
+  }
+  function scheduleSummary() {
+    const groups = [];
+    [1, 2, 3, 4, 5, 6, 0].map(n => scheduleList().find(d => d.day === n)).filter(d => d && d.open).forEach(d => {
+      const key = `${d.from}-${d.to}`; let g = groups.find(x => x.key === key);
+      if (!g) { g = { key, from: d.from, to: d.to, days: [] }; groups.push(g); }
+      g.days.push(DAY_NAMES[d.day]);
+    });
+    if (!groups.length) return 'por ahora no tiene días de pedidos';
+    const join = a => (a.length > 1 ? `${a.slice(0, -1).join(', ')} y ${a[a.length - 1]}` : a[0]);
+    return groups.map(g => `de ${join(g.days)}${g.from === '00:00' && g.to === '23:59' ? '' : `, de ${fmtHour(g.from)} a ${fmtHour(g.to)}`}`).join('; ');
   }
   function orderScheduleMessage() {
-    return 'Cochi recibe pedidos únicamente de viernes a domingo. Puedes explorar el menú y preparar tu selección; vuelve durante esos días para enviarla por WhatsApp.';
+    if (config.ordersPaused) return 'Cochi pausó los pedidos por ahora. Puedes explorar el menú y volver pronto.';
+    return `Cochi recibe pedidos ${scheduleSummary()}. Puedes explorar el menú y preparar tu selección; vuelve en ese horario para enviarla por WhatsApp.`;
   }
   function updateScheduleNotice() {
     const note = $('#orderScheduleNote');
     if (note) {
-      note.textContent = isOrderDay() ? '¡Estamos en días de pedidos! Trabajamos de viernes a domingo.' : orderScheduleMessage();
+      note.hidden = isOrderDay();
+      note.textContent = orderScheduleMessage();
       note.classList.toggle('is-closed', !isOrderDay());
     }
+    $$('[data-schedule]').forEach(el => { el.textContent = el.dataset.schedule === 'work' ? `Trabajamos ${scheduleSummary()}.` : `Pedidos ${scheduleSummary()}.`; });
     const button = $('#startCheckout');
     if (button) {
       const needsReview = cart.some(line => line.needsReview || !productAvailability(productFromCatalog(line.slug) || {}).canOrder);
@@ -83,7 +107,7 @@
       button.setAttribute('aria-describedby', 'orderScheduleNote');
       button.innerHTML = isOrderDay()
         ? 'Continuar con mis datos <svg class="ico" aria-hidden="true"><use href="#i-arrow"/></svg>'
-        : 'Pedidos de viernes a domingo';
+        : 'Fuera del horario de pedidos';
     }
   }
 
@@ -108,6 +132,7 @@
     if (!rate || !Number.isFinite(Number(rate.usdVES)) || Number(rate.usdVES) <= 0) return null;
     return Number(usd || 0) * Number(rate.usdVES);
   }
+  function cartRateText() { return rate ? `Tasa ${currencyVES(rate.usdVES).replace('Bs. ', '')} · ${formatDate(rate.effectiveDate)}${rateIsStale(rate) ? ' (por verificar)' : ''}` : ''; }
   function rateLabel() {
     if (!rate) return 'La conversión a bolívares no está disponible. El equipo de Cochi confirmará el monto por WhatsApp.';
     const status = rateIsStale(rate) ? 'Tasa Cochi por verificar' : 'Tasa manual de Cochi';
@@ -364,7 +389,7 @@
       $('#cartLines').innerHTML = '';
       $('#cartSubtotalUsd').textContent = currencyUSD(0);
       $('#cartSubtotalVes').textContent = '—';
-      $('#cartRateNote').textContent = rateLabel();
+      $('#cartRateNote').textContent = cartRateText();
       return;
     }
     $('#cartLines').innerHTML = cart.map(line => {
@@ -383,8 +408,7 @@
     const ves = getConvertedPrice(total);
     $('#cartSubtotalVes').textContent = ves === null ? 'No disponible' : currencyVES(ves);
     $('#cartSubtotalVesRow').hidden = ves === null;
-    $('#cartRateNote').textContent = rateLabel();
-    if (ves !== null && rateIsStale(rate)) $('#cartRateNote').textContent += ' Verifica la tasa antes de confirmar el pedido.';
+    $('#cartRateNote').textContent = cartRateText();
     const invalid = cart.some(line => line.needsReview || !productAvailability(productFromCatalog(line.slug) || {}).canOrder);
     $('#startCheckout').disabled = invalid || !isOrderDay();
     $('#startCheckout').title = invalid ? 'Revisa las opciones o disponibilidad de los productos.' : '';
@@ -653,17 +677,18 @@
     const sector = String(data.get('sector') || '').trim();
     const reference = String(data.get('reference') || '').trim();
     const orderNotes = String(data.get('orderNotes') || '').trim();
+    const modeLabel = mode === 'delivery' ? 'Entrega a domicilio' : mode === 'pickup' ? 'Retiro' : mode;
     const when = new Intl.DateTimeFormat('es-VE', { timeZone: 'America/Caracas', weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date());
-    const line = '━━━━━━━━━━━━━━━';
-    const rows = [`🐷🔥 *PEDIDO COCHI Nº ${orderId}*`, `🗓️ ${when}`, line, '', '👤 *CLIENTE*', `Nombre: ${fullName}`];
-    if (phone) rows.push(`📞 Teléfono: ${phone}`);
-    rows.push(mode === 'delivery' ? '🛵 Modalidad: Entrega a domicilio' : mode === 'pickup' ? '🛍️ Modalidad: Retiro' : `Modalidad: ${mode}`);
+    const line = '------------------------------';
+    const rows = [`*PEDIDO COCHI Nº ${orderId}*`, when, line, '', '*CLIENTE*', `Nombre: ${fullName}`];
+    if (phone) rows.push(`Teléfono: ${phone}`);
+    rows.push(`Modalidad: ${modeLabel}`);
     if (mode === 'delivery') {
-      if (address) rows.push(`📍 Dirección: ${address}`);
-      if (sector) rows.push(`🏘️ Sector: ${sector}`);
-      if (reference) rows.push(`🧭 Referencia: ${reference}`);
+      if (address) rows.push(`Dirección: ${address}`);
+      if (sector) rows.push(`Sector: ${sector}`);
+      if (reference) rows.push(`Referencia: ${reference}`);
     }
-    rows.push('', line, '🍽️ *DETALLE DEL PEDIDO*', '');
+    rows.push('', line, '*DETALLE DEL PEDIDO*', '');
     let n = 0;
     cart.forEach(item => {
       const product = productFromCatalog(item.slug);
@@ -671,16 +696,16 @@
       n += 1;
       rows.push(`${n}. ${item.quantity} x ${product.name}${item.promo && upsellRule(item.promo) ? ' (promo)' : ''} = ${currencyUSD(lineUnitPrice(item) * item.quantity)}`);
       const options = item.selections.map(sel => `${sel.groupName}: ${sel.choiceLabel}${sel.quantity > 1 ? ` x${sel.quantity}` : ''}`);
-      if (options.length) rows.push(`   ▫️ ${options.join(' | ')}`);
-      if (item.note.trim()) rows.push(`   📝 Nota: ${item.note.trim()}`);
+      if (options.length) rows.push(`   ${options.join(' | ')}`);
+      if (item.note.trim()) rows.push(`   Nota: ${item.note.trim()}`);
     });
     const units = cart.reduce((sum, item) => sum + item.quantity, 0);
-    rows.push('', line, '🧾 *RESUMEN*', `🍗 Productos (${units} uds.): ${currencyUSD(cartProductTotal())}`);
-    if (coupon) rows.push(`🎟️ Cupón ${coupon.code} (${couponLabel()}): -${currencyUSD(couponDiscount())}`, `*Productos con descuento: ${currencyUSD(cartProductTotal() - couponDiscount())}*`);
-    rows.push(mode === 'delivery' ? '🛵💵 El costo de entrega, el total final y el monto en Bs. te los confirma Cochi por este chat.' : '💵 El total final y el monto en Bs. te los confirma Cochi por este chat.');
-    rows.push('', line, '💳 *CONFIRMACIÓN Y PAGO*', 'El monto final, la disponibilidad y los datos de pago se confirman directamente por este chat.', 'La preparación del pedido comienza únicamente después de que Cochi reciba el depósito acordado.');
-    if (orderNotes) rows.push('', '📌 *NOTAS ADICIONALES*', orderNotes);
-    rows.push('', '📅 Cochi recibe pedidos únicamente de viernes a domingo.', '🔥 ¡Gracias por pedir en Cochi! 🐷');
+    rows.push('', line, '*RESUMEN*', `Productos (${units} uds.): ${currencyUSD(cartProductTotal())}`);
+    if (coupon) rows.push(`Cupón ${coupon.code} (${couponLabel()}): -${currencyUSD(couponDiscount())}`, `*Productos con descuento: ${currencyUSD(cartProductTotal() - couponDiscount())}*`);
+    rows.push(mode === 'delivery' ? 'El costo de entrega, el total final y el monto en Bs. te los confirma Cochi por este chat.' : 'El total final y el monto en Bs. te los confirma Cochi por este chat.');
+    rows.push('', line, '*CONFIRMACIÓN Y PAGO*', 'El monto final, la disponibilidad y los datos de pago se confirman directamente por este chat.', 'La preparación del pedido comienza únicamente después de que Cochi reciba el depósito acordado.');
+    if (orderNotes) rows.push('', '*NOTAS ADICIONALES*', orderNotes);
+    rows.push('', `Cochi recibe pedidos ${scheduleSummary()}.`, '¡Gracias por pedir en Cochi!');
     return rows.join('\n');
   }
   async function handleCheckoutSubmit(event) {
