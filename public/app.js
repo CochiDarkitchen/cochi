@@ -28,6 +28,7 @@
   let lastToastTimer = null;
   let productDialogLastFocus = null;
   let contentApi = null;
+  let couponsOn = false, coupon = null;
   let extras = { announcements: [], upsells: [], flyers: [], testimonials: [] };
   const MOTION_KEY = 'cochi-motion-off';
   let reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches || (() => { try { return localStorage.getItem(MOTION_KEY) === '1'; } catch { return false; } })();
@@ -313,6 +314,29 @@
   function cartProductTotal() {
     return cart.reduce((sum, line) => sum + lineUnitPrice(line) * line.quantity, 0);
   }
+  function couponDiscount() {
+    if (!coupon) return 0;
+    const sub = cartProductTotal();
+    return Math.round(Math.min(sub, coupon.type === 'percent' ? sub * coupon.value / 100 : coupon.value) * 100) / 100;
+  }
+  function couponLabel() { return coupon ? (coupon.type === 'percent' ? `${coupon.value}% de descuento` : `${currencyUSD(coupon.value)} de descuento`) : ''; }
+  async function couponCall(path, extra = {}) {
+    let response;
+    try {
+      response = await fetch(`/api/coupon/${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: coupon?.code || $('#couponCode').value, phone: String(new FormData($('#checkoutForm')).get('customerPhone') || ''), subtotal: cartProductTotal(), ...extra }) });
+    } catch { throw new Error('No se pudo validar el cupón. Revisa tu conexión e inténtalo otra vez.'); }
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(body.error || 'No se pudo validar el cupón.');
+    return body.coupon;
+  }
+  async function applyCoupon() {
+    const input = $('#couponCode'), msg = $('#couponMsg');
+    if (!input.value.trim()) { msg.textContent = 'Escribe tu código de cupón.'; return; }
+    msg.textContent = 'Revisando cupón...';
+    try { coupon = await couponCall('check', { code: input.value }); input.value = coupon.code; msg.textContent = `Cupón aplicado: ${couponLabel()} en productos.`; }
+    catch (error) { coupon = null; msg.textContent = error.message; }
+    renderCheckoutSummary();
+  }
   function cartFee(mode = getSelectedMode()) {
     if (mode !== 'delivery' || config.deliveryFeeUSD === null || config.deliveryFeeUSD === undefined || config.deliveryFeeUSD === '') return null;
     const num = Number(config.deliveryFeeUSD);
@@ -320,7 +344,7 @@
   }
   function cartGrandTotal(mode = getSelectedMode()) {
     const fee = cartFee(mode);
-    return cartProductTotal() + (fee === null ? 0 : fee);
+    return cartProductTotal() - couponDiscount() + (fee === null ? 0 : fee);
   }
   function renderCart() {
     if (normalizePromos()) saveCart();
@@ -565,6 +589,7 @@
     }
   }
   function renderCheckoutSummary() {
+    const couponBox = $('#couponBox'); if (couponBox) couponBox.hidden = !couponsOn; if (!couponsOn) coupon = null;
     const subtotal = cartProductTotal();
     const mode = getSelectedMode();
     const fee = cartFee(mode);
@@ -572,6 +597,7 @@
     const vesSubtotal = getConvertedPrice(subtotal);
     const vesTotal = getConvertedPrice(grand);
     let rows = `<div class="checkout-summary__row"><span>Productos (${cart.reduce((a,b)=>a+b.quantity,0)} uds.)</span><strong>${currencyUSD(subtotal)}</strong></div>`;
+    if (coupon) rows += `<div class="checkout-summary__row"><span>Cupón ${escapeHtml(coupon.code)}</span><strong>-${currencyUSD(couponDiscount())}</strong></div>`;
     if (mode === 'delivery') {
       if (fee === null) rows += '<div class="checkout-summary__row"><span>Entrega</span><strong>Por confirmar</strong></div>';
       else rows += `<div class="checkout-summary__row"><span>Entrega</span><strong>${currencyUSD(fee)}</strong></div>`;
@@ -627,45 +653,37 @@
     const sector = String(data.get('sector') || '').trim();
     const reference = String(data.get('reference') || '').trim();
     const orderNotes = String(data.get('orderNotes') || '').trim();
-    const modeLabel = mode === 'delivery' ? 'Entrega a domicilio' : mode === 'pickup' ? 'Retiro' : mode;
     const when = new Intl.DateTimeFormat('es-VE', { timeZone: 'America/Caracas', weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date());
-    const line = '------------------------------';
-    const rows = [`*PEDIDO COCHI Nº ${orderId}*`, when, line, '', '*CLIENTE*', `Nombre: ${fullName}`];
-    if (phone) rows.push(`Teléfono: ${phone}`);
-    rows.push(`Modalidad: ${modeLabel}`);
+    const line = '━━━━━━━━━━━━━━━';
+    const rows = [`🐷🔥 *PEDIDO COCHI Nº ${orderId}*`, `🗓️ ${when}`, line, '', '👤 *CLIENTE*', `Nombre: ${fullName}`];
+    if (phone) rows.push(`📞 Teléfono: ${phone}`);
+    rows.push(mode === 'delivery' ? '🛵 Modalidad: Entrega a domicilio' : mode === 'pickup' ? '🛍️ Modalidad: Retiro' : `Modalidad: ${mode}`);
     if (mode === 'delivery') {
-      if (address) rows.push(`Dirección: ${address}`);
-      if (sector) rows.push(`Sector: ${sector}`);
-      if (reference) rows.push(`Referencia: ${reference}`);
+      if (address) rows.push(`📍 Dirección: ${address}`);
+      if (sector) rows.push(`🏘️ Sector: ${sector}`);
+      if (reference) rows.push(`🧭 Referencia: ${reference}`);
     }
-    rows.push('', line, '*DETALLE DEL PEDIDO*', '');
+    rows.push('', line, '🍽️ *DETALLE DEL PEDIDO*', '');
     let n = 0;
     cart.forEach(item => {
       const product = productFromCatalog(item.slug);
       if (!product) return;
       n += 1;
-      const subtotal = lineUnitPrice(item) * item.quantity;
-      const promoRule = item.promo ? upsellRule(item.promo) : null;
-      rows.push(`${n}. ${item.quantity} x ${product.name}${promoRule ? ' (promo)' : ''} = ${currencyUSD(subtotal)}`);
+      rows.push(`${n}. ${item.quantity} x ${product.name}${item.promo && upsellRule(item.promo) ? ' (promo)' : ''} = ${currencyUSD(lineUnitPrice(item) * item.quantity)}`);
       const options = item.selections.map(sel => `${sel.groupName}: ${sel.choiceLabel}${sel.quantity > 1 ? ` x${sel.quantity}` : ''}`);
-      if (options.length) rows.push(`   ${options.join(' | ')}`);
-      if (item.note.trim()) rows.push(`   Nota: ${item.note.trim()}`);
+      if (options.length) rows.push(`   ▫️ ${options.join(' | ')}`);
+      if (item.note.trim()) rows.push(`   📝 Nota: ${item.note.trim()}`);
     });
-    const subtotal = cartProductTotal();
-    const fee = cartFee(mode);
-    const total = cartGrandTotal(mode);
     const units = cart.reduce((sum, item) => sum + item.quantity, 0);
-    rows.push('', line, '*RESUMEN*', `Productos (${units} uds.): ${currencyUSD(subtotal)}`);
-    if (mode === 'delivery') rows.push(`Entrega: ${fee === null ? 'por confirmar' : currencyUSD(fee)}`);
-    rows.push(`*TOTAL ${fee === null && mode === 'delivery' ? 'ESTIMADO (sin entrega)' : 'ESTIMADO'}: ${currencyUSD(total)}*`);
-    const ves = getConvertedPrice(total);
-    if (ves !== null && rate) rows.push(`Referencia en Bs.: ${currencyVES(ves)} (tasa ${currencyVES(rate.usdVES)} del ${formatDate(rate.effectiveDate)})`);
-    rows.push('', line, '*CONFIRMACIÓN Y PAGO*', 'El monto final, la disponibilidad, el costo de entrega y los datos de pago se confirman directamente por este chat.', 'La preparación del pedido comienza únicamente después de que Cochi reciba el depósito acordado.');
-    if (orderNotes) rows.push('', '*NOTAS ADICIONALES*', orderNotes);
-    rows.push('', 'Cochi recibe pedidos únicamente de viernes a domingo.', '¡Gracias por pedir en Cochi!');
+    rows.push('', line, '🧾 *RESUMEN*', `🍗 Productos (${units} uds.): ${currencyUSD(cartProductTotal())}`);
+    if (coupon) rows.push(`🎟️ Cupón ${coupon.code} (${couponLabel()}): -${currencyUSD(couponDiscount())}`, `*Productos con descuento: ${currencyUSD(cartProductTotal() - couponDiscount())}*`);
+    rows.push(mode === 'delivery' ? '🛵💵 El costo de entrega, el total final y el monto en Bs. te los confirma Cochi por este chat.' : '💵 El total final y el monto en Bs. te los confirma Cochi por este chat.');
+    rows.push('', line, '💳 *CONFIRMACIÓN Y PAGO*', 'El monto final, la disponibilidad y los datos de pago se confirman directamente por este chat.', 'La preparación del pedido comienza únicamente después de que Cochi reciba el depósito acordado.');
+    if (orderNotes) rows.push('', '📌 *NOTAS ADICIONALES*', orderNotes);
+    rows.push('', '📅 Cochi recibe pedidos únicamente de viernes a domingo.', '🔥 ¡Gracias por pedir en Cochi! 🐷');
     return rows.join('\n');
   }
-  function handleCheckoutSubmit(event) {
+  async function handleCheckoutSubmit(event) {
     event.preventDefault();
     const validation = validateCheckout(event.currentTarget);
     if (!validation.ok) {
@@ -678,6 +696,10 @@
       $('#checkoutError').textContent = 'El contacto de WhatsApp no parece estar configurado correctamente. Avísanos por otro canal para poder ayudarte.';
       $('#checkoutError').hidden = false;
       return;
+    }
+    if (coupon) {
+      try { coupon = await couponCall('check'); }
+      catch (error) { coupon = null; $('#couponMsg').textContent = error.message; renderCheckoutSummary(); $('#checkoutError').textContent = error.message; $('#checkoutError').hidden = false; return; }
     }
     pendingOrder = { data: validation.data, number, orderId: newOrderId() };
     showConfirm();
@@ -695,15 +717,24 @@
       const extra = [...line.selections.map(s => `${escapeHtml(s.groupName)}: ${escapeHtml(s.choiceLabel)}${s.quantity > 1 ? ` x${s.quantity}` : ''}`), line.note ? `Nota: ${escapeHtml(line.note)}` : ''].filter(Boolean).join(' · ');
       return `<li><span class="confirm-lines__qty">${line.quantity}x</span><span class="confirm-lines__name">${escapeHtml(product.name)}${line.promo ? '<span class="promo-tag">PROMO</span>' : ''}${extra ? `<small>${extra}</small>` : ''}</span><span class="confirm-lines__price">${currencyUSD(lineUnitPrice(line) * line.quantity)}</span></li>`;
     }).join('');
-    const total = cartProductTotal(), ves = getConvertedPrice(total), fee = cartFee(mode);
-    $('#confirmTotals').innerHTML = `<div><dt>Productos</dt><dd>${currencyUSD(total)}</dd></div>${ves === null ? '' : `<div><dt>Estimado en Bs.</dt><dd>${currencyVES(ves)}</dd></div>`}${mode === 'delivery' ? `<div><dt>Entrega</dt><dd>${fee === null ? 'Se confirma por WhatsApp' : currencyUSD(fee)}</dd></div>` : ''}`;
+    const total = cartProductTotal(), ves = getConvertedPrice(total - couponDiscount()), fee = cartFee(mode);
+    $('#confirmTotals').innerHTML = `<div><dt>Productos</dt><dd>${currencyUSD(total)}</dd></div>${coupon ? `<div><dt>Cupón ${escapeHtml(coupon.code)}</dt><dd>-${currencyUSD(couponDiscount())}</dd></div>` : ''}${ves === null ? '' : `<div><dt>Estimado en Bs.</dt><dd>${currencyVES(ves)}</dd></div>`}${mode === 'delivery' ? `<div><dt>Entrega</dt><dd>${fee === null ? 'Se confirma por WhatsApp' : currencyUSD(fee)}</dd></div>` : ''}`;
     const rows = [['Nombre', data.get('customerName')], ['Teléfono', data.get('customerPhone')], ['Modalidad', mode === 'delivery' ? 'Entrega a domicilio' : 'Retiro'], ...(mode === 'delivery' ? [['Dirección', data.get('address')], ['Sector', data.get('sector')], ['Referencia', data.get('reference')]] : []), ['Notas', data.get('orderNotes')]];
     $('#confirmData').innerHTML = rows.filter(([, value]) => String(value || '').trim()).map(([label, value]) => `<div><dt>${label}</dt><dd>${escapeHtml(String(value).trim())}</dd></div>`).join('');
     const pay = String(config.paymentInfo || '').trim();
     $('#confirmPay').hidden = !pay; $('#confirmPayText').textContent = pay;
   }
-  function sendPendingOrder() {
+  async function sendPendingOrder() {
     if (!pendingOrder) return;
+    if (coupon && !pendingOrder.redeemed) {
+      const button = $('#confirmSend'); button.disabled = true;
+      try { coupon = await couponCall('redeem', { orderId: pendingOrder.orderId, phone: String(pendingOrder.data.get('customerPhone') || '') }); pendingOrder.redeemed = true; }
+      catch (error) {
+        coupon = null; $('#couponMsg').textContent = error.message; renderCheckoutSummary();
+        $('#confirmView').hidden = true; $('#checkoutView').hidden = false; $('#checkoutError').textContent = error.message; $('#checkoutError').hidden = false;
+        return;
+      } finally { button.disabled = false; }
+    }
     const url = `https://wa.me/${pendingOrder.number}?text=${encodeURIComponent(buildWhatsAppMessage(pendingOrder.data, pendingOrder.orderId))}`;
     $('#confirmFallbackLink').href = url; $('#confirmFallback').hidden = false;
     const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.matchMedia('(pointer: coarse)').matches;
@@ -873,6 +904,7 @@
       const controller = new AbortController();
       const timer = window.setTimeout(() => controller.abort(), 4500);
       const data = await fetch('/api/content', { cache: 'no-store', signal: controller.signal }).then(readJSONResponse).finally(() => window.clearTimeout(timer));
+      couponsOn = Boolean(data && data.couponsEnabled);
       contentApi = data && Array.isArray(data.products) && data.products.length ? data : null;
     } catch { contentApi = null; }
     let fallback = {};
@@ -1080,6 +1112,9 @@
     $('#backToCart').addEventListener('click', () => { $('#checkoutView').hidden = true; $('#cartView').hidden = false; });
     $('#backToData').addEventListener('click', () => { $('#confirmView').hidden = true; $('#checkoutView').hidden = false; $('#cartDrawer').scrollTop = 0; $('#checkoutForm [name="customerName"]')?.focus({ preventScroll: true }); });
     $('#confirmSend').addEventListener('click', sendPendingOrder);
+    $('#couponApply').addEventListener('click', applyCoupon);
+    $('#couponCode').addEventListener('keydown', event => { if (event.key === 'Enter') { event.preventDefault(); applyCoupon(); } });
+    $('#couponCode').addEventListener('input', () => { if (coupon && coupon.code !== $('#couponCode').value.trim().toUpperCase()) { coupon = null; $('#couponMsg').textContent = ''; renderCheckoutSummary(); } });
     $('#copyPay').addEventListener('click', copyPaymentInfo);
     $('#checkoutForm').addEventListener('submit', handleCheckoutSubmit);
     $('#checkoutForm').addEventListener('change', event => {

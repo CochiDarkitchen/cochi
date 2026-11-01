@@ -54,14 +54,15 @@ async function waitForServer(url, child) {
   assert.ok(html.includes('La preparación comienza únicamente después de recibir el depósito acordado.'), 'La web debe comunicar cuándo comienza la preparación.');
   const messageBuilder = app.slice(app.indexOf('function buildWhatsAppMessage'), app.indexOf('function handleCheckoutSubmit'));
   assert.ok(messageBuilder.includes('Monto final') || messageBuilder.includes('monto final'));
-  assert.ok(messageBuilder.includes('currencyUSD') && messageBuilder.includes('cartProductTotal') && messageBuilder.includes('TOTAL'), 'La factura de WhatsApp debe incluir el detalle y el total estimado.');
+  assert.ok(messageBuilder.includes('DETALLE DEL PEDIDO') && messageBuilder.includes('currencyUSD'), 'La factura de WhatsApp debe incluir el detalle con precios.');
+  assert.ok(!messageBuilder.includes('currencyVES') && !messageBuilder.includes('cartGrandTotal'), 'El total final con entrega y los bolívares los confirma Cochi por el chat.');
   assert.ok(html.includes('TRABAJAMOS DE VIERNES A DOMINGO') && html.includes('orderScheduleNote'));
   assert.ok(!html.includes('/admin.html') && !app.includes('supabaseUrl') && !app.includes('/api/bcv') && !app.includes('/api/config'), 'La experiencia pública no debe depender de Admin, Supabase ni APIs de tasa.');
   const htmlIds = new Set([...html.matchAll(/\bid="([^"]+)"/g)].map(match => match[1]));
   const appStaticIds = new Set([...app.matchAll(/\$\('#([A-Za-z][A-Za-z0-9_-]*)'/g)].map(match => match[1]));
   const dynamicIds = new Set(['modalQtyMinus', 'modalQtyValue', 'modalQtyPlus', 'saveProductToCart', 'productDialogError', 'productNote', 'upsellCheck']);
   assert.deepEqual([...appStaticIds].filter(id => !htmlIds.has(id) && !dynamicIds.has(id)), [], 'El frontend no debe buscar elementos inexistentes.');
-  ok('Tasa manual, factura de WhatsApp con detalle y total, depósito antes de preparar, horario y referencias HTML validados.');
+  ok('Tasa manual, factura de WhatsApp con detalle (sin total final), depósito antes de preparar, horario y referencias HTML validados.');
 
   const port = 4184;
   const child = spawn(process.execPath, ['scripts/dev-server.js'], { cwd: root, env: { ...process.env, PORT: String(port), ADMIN_EMAIL: 'dueno@cochi.test', ADMIN_PASSWORD: 'clave-de-prueba-123', SESSION_SECRET: 'secreto-de-prueba-largo-123', COCHI_STORAGE_DIR: fs.mkdtempSync(path.join(os.tmpdir(), 'cochi-test-')) }, stdio: 'ignore' });
@@ -90,7 +91,7 @@ async function waitForServer(url, child) {
     const adminPage = await fetch(`${base}/admin/`);
     assert.equal(adminPage.status, 200); assert.equal(adminPage.headers.get('x-robots-tag'), 'noindex, nofollow');
     assert.equal((await fetch(`${base}/data/extras.json`)).status, 200);
-    assert.deepEqual(await (await fetch(`${base}/api/content`)).json(), {}, 'Sin cambios guardados, el sitio usa los archivos de /data.');
+    assert.deepEqual(await (await fetch(`${base}/api/content`)).json(), { couponsEnabled: false }, 'Sin cambios guardados, el sitio usa los archivos de /data.');
     assert.equal((await fetch(`${base}/api/admin/content`)).status, 401, 'El contenido de admin exige sesión.');
     const wrong = await fetch(`${base}/api/admin/login`, { method: 'POST', headers: json, body: JSON.stringify({ email: 'dueno@cochi.test', password: 'incorrecta' }) });
     assert.equal(wrong.status, 401);

@@ -2,7 +2,7 @@
   'use strict';
   const $ = (s, r = document) => r.querySelector(s);
   const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const TABS = [['tasa', 'Tasa y datos'], ['productos', 'Productos'], ['flyers', 'Flyers'], ['comentarios', 'Comentarios'], ['ofertas', 'Ofertas y avisos']];
+  const TABS = [['tasa', 'Tasa y datos'], ['productos', 'Productos'], ['flyers', 'Flyers'], ['comentarios', 'Comentarios'], ['ofertas', 'Ofertas y avisos'], ['cupones', 'Cupones']];
   let data = null, tab = 'tasa', dirty = false, openSlug = null, query = '', storage = 'file', fromDefaults = false, toastTimer = null;
 
   async function api(path, options = {}) {
@@ -84,6 +84,17 @@
         <div class="item__bar">${sw(`testimonials.${i}.active`, t.active !== false, 'Visible')}<button type="button" class="btn btn--danger" data-act="delQuote" data-i="${i}">Eliminar</button></div></article>`).join('');
       return `<section class="card"><h2>Comentarios de clientes</h2><p class="card__intro">Publica solo comentarios reales y con permiso de quien los escribió. Si no hay ninguno visible, la sección no se muestra.</p>
         <button type="button" class="btn btn--red" data-act="addQuote">Agregar comentario</button></section>${cards}`;
+    },
+    cupones() {
+      const cp = data.cp;
+      const items = cp.coupons.map((c, i) => `<article class="item"><div class="item__fields">
+        <div class="row2">${field('Código', `cp.coupons.${i}.code`, c.code, 'maxlength="20" autocapitalize="characters"', 'Letras y números, sin espacios')}${field('Nota interna', `cp.coupons.${i}.label`, c.label || '', 'maxlength="60"', 'Solo para ti, ej. "Instagram octubre"')}</div>
+        <div class="row2"><label class="field">Tipo de descuento<select data-b="cp.coupons.${i}.type" data-after="rerender"><option value="percent" ${c.type !== 'fixed' ? 'selected' : ''}>Porcentaje (%)</option><option value="fixed" ${c.type === 'fixed' ? 'selected' : ''}>Monto fijo (USD)</option></select></label>${field(c.type === 'fixed' ? 'Descuento (USD)' : 'Descuento (%)', `cp.coupons.${i}.value`, c.value, 'type="number" data-t="n" step="any" min="0" inputmode="decimal"')}</div>
+        <div class="row2">${field('Usos máximos', `cp.coupons.${i}.max_uses`, c.max_uses || 0, 'type="number" data-t="n" min="0"', '0 = sin límite')}${field('Pedido mínimo (USD)', `cp.coupons.${i}.min_order_usd`, c.min_order_usd || 0, 'type="number" data-t="n" step="0.01" min="0"', '0 = sin mínimo')}</div>
+        ${field('Solo para este teléfono (opcional)', `cp.coupons.${i}.phone`, c.phone || '', 'type="tel" inputmode="tel" maxlength="20"', 'Si lo llenas, solo ese cliente podrá usar el cupón.')}
+        ${dates(`cp.coupons.${i}`, c)}<p class="preview">Usos hasta ahora: ${c.uses || 0}${c.max_uses ? ` de ${c.max_uses}` : ''}.</p></div>
+        <div class="item__bar">${sw(`cp.coupons.${i}.active`, c.active !== false, 'Activo')}${sw(`cp.coupons.${i}.per_customer`, Boolean(c.per_customer), 'Un uso por cliente')}<button type="button" class="btn btn--small" data-act="genCode" data-i="${i}">Generar código</button><button type="button" class="btn btn--danger" data-act="delCoupon" data-i="${i}">Eliminar</button></div></article>`).join('');
+      return `<section class="card"><h2>Cupones de descuento</h2><p class="card__intro">Función de prueba. El interruptor enciende o apaga los cupones en toda la tienda. Un uso se cuenta cuando el cliente pulsa "Enviar por WhatsApp". Recuerda pulsar "Guardar cambios".</p>${sw('cp.enabled', cp.enabled, 'Cupones activados en la tienda')}<br><button type="button" class="btn btn--red" data-act="addCoupon">Crear cupón</button></section>${items}`;
     },
     ofertas() {
       const rules = data.upsells.map((u, i) => {
@@ -179,6 +190,9 @@
     flyerDown(el) { const i = +el.dataset.i; [data.flyers[i + 1], data.flyers[i]] = [data.flyers[i], data.flyers[i + 1]]; markDirty(); render(); },
     addQuote() { data.testimonials.unshift({ id: Math.random().toString(16).slice(2, 12), name: '', text: '', active: true }); markDirty(); render(); },
     delQuote(el) { if (confirm('¿Eliminar este comentario?')) { data.testimonials.splice(el.dataset.i, 1); markDirty(); render(); } },
+    addCoupon() { data.cp.coupons.unshift({ code: '', label: '', type: 'percent', value: 10, max_uses: 0, per_customer: false, phone: '', min_order_usd: 0, active: true, start: '', end: '' }); markDirty(); render(); },
+    delCoupon(el) { if (confirm('¿Eliminar este cupón?')) { data.cp.coupons.splice(el.dataset.i, 1); markDirty(); render(); } },
+    genCode(el) { data.cp.coupons[el.dataset.i].code = `COCHI-${Math.random().toString(36).slice(2, 6).toUpperCase()}`; markDirty(); render(); },
     addRule() { data.upsells.push({ id: `sugerencia-${Math.random().toString(16).slice(2, 7)}`, title: 'Agrégale algo más', text: '', when_categories: [], add_slug: data.products[0]?.slug || '', price_usd: 1, max_per_item: 1, active: true, start: '', end: '' }); markDirty(); render(); },
     delRule(el) { if (confirm('¿Eliminar esta sugerencia?')) { data.upsells.splice(el.dataset.i, 1); markDirty(); render(); } },
     addAnn() { data.announcements.push(''); markDirty(); render(); },
@@ -220,7 +234,10 @@
     const button = $('#saveBtn'); button.disabled = true; button.textContent = 'Guardando...';
     try {
       data.upsells.forEach(u => { u.price_usd = Number(u.price_usd) || 0; });
-      await api('content', { method: 'PUT', body: JSON.stringify({ content: data }) });
+      const { cp, ...content } = data;
+      await api('content', { method: 'PUT', body: JSON.stringify({ content }) });
+      await api('coupons', { method: 'PUT', body: JSON.stringify({ coupons: cp }) });
+      data.cp = (await api('coupons')).coupons;
       fromDefaults = false; markDirty(false); render(); toast('Guardado. El sitio ya muestra los cambios.');
     } catch (error) { if (error.status === 401) showLogin('Tu sesión venció. Entra de nuevo.'); else toast(error.message, true); markDirty(true); }
     finally { button.textContent = 'Guardar cambios'; button.disabled = !dirty || storage === 'none'; }
@@ -240,6 +257,7 @@
       data = { settings, products, ...extras };
     }
     ['products', 'flyers', 'testimonials', 'upsells', 'announcements'].forEach(k => { if (!Array.isArray(data[k])) data[k] = []; });
+    data.cp = await api('coupons').then(r => r.coupons).catch(() => ({ enabled: false, coupons: [] }));
     $('#login').hidden = true; $('#app').hidden = false; markDirty(false); render();
   }
   $('#loginForm').addEventListener('submit', async event => {

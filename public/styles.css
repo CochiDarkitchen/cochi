@@ -365,3 +365,5 @@ legend b,label b,fieldset b{color:var(--red-ink)}
 .confirm-view>h3{margin:0 0 8px;font-size:37px;line-height:.97;letter-spacing:-.08em;font-weight:900}
 .confirm-view>h3 em{font-style:normal;color:var(--red-ink)}
 @media (max-width:760px){.confirm-view>h3{font-size:33px}}
+
+.coupon{margin:4px 0 8px}.coupon__row{display:flex;gap:8px}.coupon__row input{flex:1;min-width:0;text-transform:uppercase}.coupon__row .button{min-height:48px;padding:0 20px}
