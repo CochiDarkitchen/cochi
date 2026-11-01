@@ -13,6 +13,7 @@ const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
 const html = fs.readFileSync(path.join(publicDir, 'index.html'), 'utf8');
 const app = fs.readFileSync(path.join(publicDir, 'app.js'), 'utf8');
 const css = fs.readFileSync(path.join(publicDir, 'styles.css'), 'utf8');
+const directCouponsRoute = path.join(root, 'api', 'admin', 'coupons.js');
 
 function ok(message) { console.log(`OK: ${message}`); }
 async function waitForServer(url, child) {
@@ -100,6 +101,25 @@ async function waitForServer(url, child) {
     const setCookie = login.headers.get('set-cookie') || '';
     assert.ok(/HttpOnly/.test(setCookie) && /SameSite=Strict/.test(setCookie), 'La sesión debe ser HttpOnly y SameSite=Strict.');
     const auth = { ...json, Cookie: setCookie.split(';')[0] };
+    assert.ok(fs.existsSync(directCouponsRoute), 'Cupones debe tener una ruta explícita para Vercel.');
+    const couponRead = await fetch(`${base}/api/admin/coupons`, { headers: auth });
+    assert.equal(couponRead.status, 200, 'El panel debe poder leer los cupones.');
+    assert.deepEqual((await couponRead.json()).coupons, { enabled: false, coupons: [] });
+    const couponConfig = { enabled: true, coupons: [{ code: 'COCHI10', label: 'Prueba', type: 'percent', value: 10, max_uses: 2, per_customer: true, phone: '', min_order_usd: 0, active: true, start: '', end: '' }] };
+    const couponWrite = await fetch(`${base}/api/admin/coupons`, { method: 'PUT', headers: auth, body: JSON.stringify({ coupons: couponConfig }) });
+    assert.equal(couponWrite.status, 200, 'El panel debe poder guardar los cupones.');
+    const couponSaved = await (await fetch(`${base}/api/admin/coupons`, { headers: auth })).json();
+    assert.equal(couponSaved.coupons.enabled, true);
+    assert.equal(couponSaved.coupons.coupons[0].code, 'COCHI10');
+    assert.equal(couponSaved.coupons.coupons[0].uses, 0);
+    const couponCheck = await fetch(`${base}/api/coupon/check`, { method: 'POST', headers: json, body: JSON.stringify({ code: 'COCHI10', phone: '04121234567', subtotal: 20 }) });
+    assert.equal(couponCheck.status, 200, 'El sitio debe validar un cupón activo.');
+    assert.equal((await couponCheck.json()).coupon.discount, 2);
+    const couponRedeem = await fetch(`${base}/api/coupon/redeem`, { method: 'POST', headers: json, body: JSON.stringify({ code: 'COCHI10', phone: '04121234567', subtotal: 20, orderId: 'CH-2026-0001' }) });
+    assert.equal(couponRedeem.status, 200, 'El sitio debe registrar el uso de un cupón.');
+    const couponAfterUse = await (await fetch(`${base}/api/admin/coupons`, { headers: auth })).json();
+    assert.equal(couponAfterUse.coupons.coupons[0].uses, 1, 'El uso del cupón debe reflejarse en el panel.');
+    assert.equal((await (await fetch(`${base}/api/content`)).json()).couponsEnabled, true, 'La tienda debe conocer si los cupones están activados.');
     const extras = JSON.parse(fs.readFileSync(path.join(publicDir, 'data/extras.json'), 'utf8'));
     const draft = { settings, products: JSON.parse(JSON.stringify(catalog)), ...extras };
     draft.products[0].price_usd = 9.75; draft.settings.usdToVes = 901.55;
@@ -123,6 +143,7 @@ async function waitForServer(url, child) {
     const fake = await fetch(`${base}/api/admin/upload`, { method: 'POST', headers: auth, body: JSON.stringify({ dataUrl: `data:image/webp;base64,${Buffer.from('no soy una imagen').toString('base64')}` }) });
     assert.equal(fake.status, 400, 'Un archivo que no es imagen se rechaza.');
     ok('Panel admin: login, sesión segura, guardado validado, protección de origen y subida de imágenes.');
+    ok('Cupones: lectura y guardado desde el panel, validación pública y conteo de usos comprobados.')
     const withExtras = JSON.parse(JSON.stringify(draft));
     withExtras.products[0].tag = 'Más pedido'; withExtras.settings.paymentInfo = 'Pago Móvil 0424-0000000'; withExtras.flyers[0].start = '2026-11-01'; withExtras.flyers[0].end = '2026-11-03';
     assert.equal((await put(withExtras)).status, 200);
