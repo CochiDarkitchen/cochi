@@ -2,13 +2,14 @@
   'use strict';
   const $ = (s, r = document) => r.querySelector(s);
   const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const TABS = [['tasa', 'Tasa y datos'], ['horario', 'Horario'], ['productos', 'Productos'], ['flyers', 'Flyers'], ['comentarios', 'Comentarios'], ['ofertas', 'Ofertas y avisos'], ['cupones', 'Cupones']];
-  let data = null, tab = 'tasa', dirty = false, openSlug = null, query = '', storage = 'file', fromDefaults = false, toastTimer = null;
+  const TABS = [['tasa', 'Tasa y datos'], ['horario', 'Horario'], ['productos', 'Productos'], ['flyers', 'Flyers'], ['comentarios', 'Comentarios'], ['ofertas', 'Ofertas y avisos'], ['cupones', 'Cupones'], ['clientes', 'Clientes']];
+  let data = null, tab = 'tasa', dirty = false, openSlug = null, query = '', storage = 'file', fromDefaults = false, toastTimer = null, customers = [], customerQuery = '';
 
   async function api(path, options = {}) {
     const response = await fetch(`/api/admin/${path}`, { credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, ...options });
-    const body = await response.json().catch(() => ({}));
-    if (!response.ok) throw Object.assign(new Error(body.error || 'No se pudo completar la acción.'), { status: response.status });
+    const raw = await response.text();
+    let body = {}; try { body = raw ? JSON.parse(raw) : {}; } catch {}
+    if (!response.ok) throw Object.assign(new Error(body.error || `El servidor respondió ${response.status}${raw && !body.error ? `: ${raw.slice(0, 180)}` : '.'}`), { status: response.status });
     return body;
   }
   function toast(text, bad = false) {
@@ -109,12 +110,30 @@
         <label class="field">Producto que se ofrece<select data-b="upsells.${i}.add_slug" data-after="rerender">${data.products.map(x => `<option value="${esc(x.slug)}" ${x.slug === u.add_slug ? 'selected' : ''}>${esc(x.name)} ($${money(x.price_usd)})</option>`).join('')}</select></label>
         <div class="row2">${field('Precio con la oferta (USD)', `upsells.${i}.price_usd`, u.price_usd, 'type="number" data-t="n" step="0.01" min="0" inputmode="decimal" data-after="rerender"')}${field('Unidades por producto', `upsells.${i}.max_per_item`, u.max_per_item, 'type="number" data-t="n" min="1" max="5"')}</div>
         <p class="preview">${p ? (saving > 0 ? `El cliente ahorra $${money(saving)} (normal $${money(p.price_usd)}).` : 'Esta oferta no baja el precio normal.') : 'Elige un producto.'}</p>
-        ${dates(`upsells.${i}`, u)}<div class="field">Se ofrece cuando pide de la categoría<div class="checks">${categories().map(c => `<label class="chk"><input type="checkbox" data-act-change="ruleCat" data-i="${i}" value="${esc(c)}" ${u.when_categories.includes(c) ? 'checked' : ''}>${esc(c)}</label>`).join('')}</div></div></div>
+        ${dates(`upsells.${i}`, u)}
+        <div class="row2">${field('Desde qué hora (opcional)', `upsells.${i}.start_time`, u.start_time || '', 'type="time"')}${field('Hasta qué hora (opcional)', `upsells.${i}.end_time`, u.end_time || '', 'type="time"')}</div>
+        <div class="field">Días de la semana (sin marcar = todos)<div class="checks">${['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'].map((d, day) => `<label class="chk"><input type="checkbox" data-act-change="ruleDay" data-i="${i}" value="${day}" ${Array.isArray(u.days) && u.days.includes(day) ? 'checked' : ''}>${d}</label>`).join('')}</div></div>
+        <div class="field">Se ofrece cuando pide de la categoría<div class="checks">${categories().map(c => `<label class="chk"><input type="checkbox" data-act-change="ruleCat" data-i="${i}" value="${esc(c)}" ${u.when_categories.includes(c) ? 'checked' : ''}>${esc(c)}</label>`).join('')}</div></div></div>
         <div class="item__bar">${sw(`upsells.${i}.active`, u.active !== false, 'Activa')}<button type="button" class="btn btn--danger" data-act="delRule" data-i="${i}">Eliminar</button></div></article>`;
       }).join('');
       const ann = data.announcements.map((a, i) => `<div class="row-inline"><label class="field"><span class="sr-only">Aviso ${i + 1}</span><input data-b="announcements.${i}" value="${esc(a)}" maxlength="60"></label><button type="button" class="btn btn--danger" data-act="delAnn" data-i="${i}" aria-label="Quitar aviso">Quitar</button></div>`).join('');
       return `<section class="card"><h2>Sugerencias al pedir</h2><p class="card__intro">Ofertas que aparecen al elegir un producto y en el pedido, por ejemplo: papas por $1 con cada shawarma. El ahorro se calcula solo.</p><button type="button" class="btn btn--red" data-act="addRule">Agregar sugerencia</button></section>${rules}
         <section class="card"><h2>Avisos de la barra roja</h2><p class="card__intro">Frases que giran en la franja superior del sitio. Máximo 8.</p>${ann}<button type="button" class="btn btn--small" data-act="addAnn" ${data.announcements.length >= 8 ? 'disabled' : ''}>Agregar aviso</button></section>`;
+    },
+    clientes() {
+      const q = customerQuery.trim().toLowerCase();
+      const rows = customers.filter(c => !q || `${c.name} ${c.phone} ${c.email || ''}`.toLowerCase().includes(q));
+      const cards = rows.map(c => {
+        const orders = Array.isArray(c.orders) ? c.orders : [];
+        const last = orders[0], wa = String(c.phone || '').replace(/\\D/g, '');
+        return `<article class="item"><div class="item__fields"><h3>${esc(c.name)}</h3><p class="preview">Teléfono: ${esc(c.phone)}${c.email ? ` · Correo: ${esc(c.email)}` : ''}</p>
+          <p class="preview">${c.address ? `Dirección: ${esc(c.address)} · ${esc(c.sector || '')}` : 'Sin dirección registrada'}${c.reference ? ` · Ref.: ${esc(c.reference)}` : ''}</p>
+          <p class="preview">${orders.length} pedido(s) · ${last ? `Último: ${new Date(last.createdAt).toLocaleString('es-VE')}` : 'Sin pedidos'}</p>
+          <p class="preview">${c.marketingConsent ? `Aceptó recibir promociones por ${c.marketingChannel === 'email' ? 'correo' : 'WhatsApp'}` : 'No autorizó promociones'}</p>
+          ${orders.slice(0, 5).map(o => `<div class="preview"><strong>${esc(o.id || 'Pedido')}</strong> · ${new Date(o.createdAt).toLocaleString('es-VE')} · $${money(o.total)}<br>${(o.items || []).map(it => `${esc(it.quantity)}× ${esc(it.name)}`).join(' · ')}</div>`).join('')}
+        </div><div class="item__bar"><a class="btn btn--small" href="https://wa.me/${wa}" target="_blank" rel="noopener">Abrir WhatsApp</a></div></article>`;
+      }).join('');
+      return `<section class="card"><h2>Registro de clientes</h2><p class="card__intro">Datos privados visibles solo desde el panel. Se registran al enviar un pedido a WhatsApp. Solo los clientes que acepten recibir promociones aparecerán como autorizados.</p><input type="search" id="customerSearch" placeholder="Buscar por nombre, teléfono o correo" value="${esc(customerQuery)}" aria-label="Buscar clientes"><p class="preview">${rows.length} cliente(s) encontrado(s) · ${customers.length} en total</p></section>${cards || '<section class="card"><p class="muted">Todavía no hay clientes registrados.</p></section>'}`;
     }
   };
 
@@ -199,7 +218,7 @@
     addCoupon() { data.cp.coupons.unshift({ code: '', label: '', type: 'percent', value: 10, max_uses: 0, per_customer: false, phone: '', min_order_usd: 0, active: true, start: '', end: '' }); markDirty(); render(); },
     delCoupon(el) { if (confirm('¿Eliminar este cupón?')) { data.cp.coupons.splice(el.dataset.i, 1); markDirty(); render(); } },
     genCode(el) { data.cp.coupons[el.dataset.i].code = `COCHI-${Math.random().toString(36).slice(2, 6).toUpperCase()}`; markDirty(); render(); },
-    addRule() { data.upsells.push({ id: `sugerencia-${Math.random().toString(16).slice(2, 7)}`, title: 'Agrégale algo más', text: '', when_categories: [], add_slug: data.products[0]?.slug || '', price_usd: 1, max_per_item: 1, active: true, start: '', end: '' }); markDirty(); render(); },
+    addRule() { data.upsells.push({ id: `sugerencia-${Math.random().toString(16).slice(2, 7)}`, title: 'Agrégale algo más', text: '', when_categories: [], add_slug: data.products[0]?.slug || '', price_usd: 1, max_per_item: 1, active: true, start: '', end: '', start_time: '', end_time: '', days: [] }); markDirty(); render(); },
     delRule(el) { if (confirm('¿Eliminar esta sugerencia?')) { data.upsells.splice(el.dataset.i, 1); markDirty(); render(); } },
     addAnn() { data.announcements.push(''); markDirty(); render(); },
     delAnn(el) { data.announcements.splice(el.dataset.i, 1); markDirty(); render(); }
@@ -210,17 +229,19 @@
   };
   const CHANGES = {
     flyerLink(el) { const f = data.flyers[el.dataset.i]; f.link = el.value === '__url' ? 'https://' : el.value; if (!el.value) f.linkLabel = ''; markDirty(); render(); },
-    ruleCat(el) { const rule = data.upsells[el.dataset.i]; const set = new Set(rule.when_categories); el.checked ? set.add(el.value) : set.delete(el.value); rule.when_categories = [...set]; markDirty(); }
+    ruleCat(el) { const rule = data.upsells[el.dataset.i]; const set = new Set(rule.when_categories); el.checked ? set.add(el.value) : set.delete(el.value); rule.when_categories = [...set]; markDirty(); },
+    ruleDay(el) { const rule = data.upsells[el.dataset.i]; const set = new Set(rule.days || []); el.checked ? set.add(Number(el.value)) : set.delete(Number(el.value)); rule.days = [...set].sort(); markDirty(); }
   };
 
   document.addEventListener('click', async event => {
     const tabButton = event.target.closest('[data-tab]');
-    if (tabButton) { tab = tabButton.dataset.tab; render(); window.scrollTo({ top: 0 }); return; }
+    if (tabButton) { tab = tabButton.dataset.tab; if (tab === 'clientes') api('customers').then(r => { customers = r.customers || []; render(); }).catch(e => toast(e.message, true)); render(); window.scrollTo({ top: 0 }); return; }
     const el = event.target.closest('[data-act]'); if (!el) return;
     try { await ACTIONS[el.dataset.act]?.(el); } catch (error) { if (error.status === 401) showLogin('Tu sesión venció. Entra de nuevo.'); else toast(error.message, true); }
   });
   document.addEventListener('input', event => {
     if (event.target.id === 'q') { query = event.target.value; $('#plist').innerHTML = productList(); return; }
+    if (event.target.id === 'customerSearch') { customerQuery = event.target.value; const pos = event.target.selectionStart; render(); const input = $('#customerSearch'); input.focus(); input.setSelectionRange(pos, pos); return; }
     const el = event.target.closest('[data-b]'); if (!el) return;
     const kind = el.dataset.t; let value;
     if (el.type === 'checkbox') value = el.checked;
@@ -242,8 +263,12 @@
       data.upsells.forEach(u => { u.price_usd = Number(u.price_usd) || 0; });
       const { cp, ...content } = data;
       await api('content', { method: 'PUT', body: JSON.stringify({ content }) });
-      await api('coupons', { method: 'PUT', body: JSON.stringify({ coupons: cp }) });
-      data.cp = (await api('coupons')).coupons;
+      try {
+        await api('coupons', { method: 'PUT', body: JSON.stringify({ coupons: cp }) });
+        data.cp = (await api('coupons')).coupons;
+      } catch (couponError) {
+        throw new Error(`El contenido principal se guardó, pero los cupones no: ${couponError.message}`);
+      }
       fromDefaults = false; markDirty(false); render(); toast('Guardado. El sitio ya muestra los cambios.');
     } catch (error) { if (error.status === 401) showLogin('Tu sesión venció. Entra de nuevo.'); else toast(error.message, true); markDirty(true); }
     finally { button.textContent = 'Guardar cambios'; button.disabled = !dirty || storage === 'none'; }

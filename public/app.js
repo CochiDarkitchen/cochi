@@ -643,6 +643,7 @@
     const error = $('#checkoutError');
     const invalidFields = [];
     if (!name) invalidFields.push(['customerName','Escribe tu nombre y apellido.']);
+    if (String(data.get('customerPhone') || '').replace(/\D/g, '').length < 7) invalidFields.push(['customerPhone','Escribe un teléfono válido para poder contactarte.']);
     if (!cart.length) return { ok:false, message:'Tu carrito está vacío. Añade algún producto antes de continuar.' };
     if (mode === 'delivery' && !address) invalidFields.push(['address','Escribe la dirección donde se entregará el pedido.']);
     if (mode === 'delivery' && !sector) invalidFields.push(['sector','Escribe el sector o la urbanización.']);
@@ -744,7 +745,7 @@
     }).join('');
     const total = cartProductTotal(), ves = getConvertedPrice(total - couponDiscount()), fee = cartFee(mode);
     $('#confirmTotals').innerHTML = `<div><dt>Productos</dt><dd>${currencyUSD(total)}</dd></div>${coupon ? `<div><dt>Cupón ${escapeHtml(coupon.code)}</dt><dd>-${currencyUSD(couponDiscount())}</dd></div>` : ''}${ves === null ? '' : `<div><dt>Estimado en Bs.</dt><dd>${currencyVES(ves)}</dd></div>`}${mode === 'delivery' ? `<div><dt>Entrega</dt><dd>${fee === null ? 'Se confirma por WhatsApp' : currencyUSD(fee)}</dd></div>` : ''}`;
-    const rows = [['Nombre', data.get('customerName')], ['Teléfono', data.get('customerPhone')], ['Modalidad', mode === 'delivery' ? 'Entrega a domicilio' : 'Retiro'], ...(mode === 'delivery' ? [['Dirección', data.get('address')], ['Sector', data.get('sector')], ['Referencia', data.get('reference')]] : []), ['Notas', data.get('orderNotes')]];
+    const rows = [['Nombre', data.get('customerName')], ['Teléfono', data.get('customerPhone')], ['Correo', data.get('customerEmail')], ['Modalidad', mode === 'delivery' ? 'Entrega a domicilio' : 'Retiro'], ...(mode === 'delivery' ? [['Dirección', data.get('address')], ['Sector', data.get('sector')], ['Referencia', data.get('reference')]] : []), ['Notas', data.get('orderNotes')]];
     $('#confirmData').innerHTML = rows.filter(([, value]) => String(value || '').trim()).map(([label, value]) => `<div><dt>${label}</dt><dd>${escapeHtml(String(value).trim())}</dd></div>`).join('');
     const pay = String(config.paymentInfo || '').trim();
     $('#confirmPay').hidden = !pay; $('#confirmPayText').textContent = pay;
@@ -760,6 +761,24 @@
         return;
       } finally { button.disabled = false; }
     }
+    // Registro privado del pedido: si falla el almacenamiento, no impedimos que el cliente abra WhatsApp.
+    try {
+      const formData = pendingOrder.data;
+      const orderItems = cart.map(item => {
+        const product = productFromCatalog(item.slug);
+        return product ? { name: product.name, quantity: item.quantity, unitPrice: lineUnitPrice(item) } : null;
+      }).filter(Boolean);
+      await fetch('/api/orders', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId: pendingOrder.orderId, name: formData.get('customerName'), phone: formData.get('customerPhone'),
+          email: formData.get('customerEmail'), address: formData.get('address'), sector: formData.get('sector'),
+          reference: formData.get('reference'), mode: formData.get('orderMode'), notes: formData.get('orderNotes'),
+          marketingConsent: formData.get('marketingConsent') === 'yes', marketingChannel: 'whatsapp',
+          items: orderItems, total: Math.max(0, cartProductTotal() - couponDiscount())
+        })
+      });
+    } catch (error) { console.warn('No se pudo registrar el pedido en el panel:', error); }
     const url = `https://wa.me/${pendingOrder.number}?text=${encodeURIComponent(buildWhatsAppMessage(pendingOrder.data, pendingOrder.orderId))}`;
     $('#confirmFallbackLink').href = url; $('#confirmFallback').hidden = false;
     const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.matchMedia('(pointer: coarse)').matches;
@@ -869,7 +888,19 @@
   /* ---------- Sugerencias al pedir (promos) ---------- */
   function inWindow(item) { const today = todayInCaracas(); return (!item.start || today >= item.start) && (!item.end || today <= item.end); }
   function tagBadge(product) { return product.tag ? `<span class="product-badge product-badge--tag">${escapeHtml(product.tag)}</span>` : ''; }
-  function upsellRules() { return (extras.upsells || []).filter(rule => rule && rule.active !== false && inWindow(rule) && productFromCatalog(rule.add_slug)); }
+  function upsellRules() {
+    const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Caracas' }));
+    const day = now.getDay(), hm = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+    return (extras.upsells || []).filter(rule => {
+      if (!rule || rule.active === false || !inWindow(rule) || !productFromCatalog(rule.add_slug)) return false;
+      if (Array.isArray(rule.days) && rule.days.length && !rule.days.includes(day)) return false;
+      if (rule.start_time && rule.end_time) {
+        const inside = rule.start_time <= rule.end_time ? hm >= rule.start_time && hm <= rule.end_time : hm >= rule.start_time || hm <= rule.end_time;
+        if (!inside) return false;
+      }
+      return true;
+    });
+  }
   function upsellRule(id) { return (extras.upsells || []).find(rule => rule && rule.id === id); }
   function promoPrice(rule) { const product = productFromCatalog(rule.add_slug); return product ? Math.min(Number(rule.price_usd), Number(product.price_usd)) : 0; }
   function promoSaving(rule) { const product = productFromCatalog(rule.add_slug); return product ? Math.max(0, Number(product.price_usd) - promoPrice(rule)) : 0; }
