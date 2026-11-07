@@ -766,18 +766,31 @@
       const formData = pendingOrder.data;
       const orderItems = cart.map(item => {
         const product = productFromCatalog(item.slug);
-        return product ? { name: product.name, quantity: item.quantity, unitPrice: lineUnitPrice(item) } : null;
+        if (!product) return null;
+        return {
+          name: product.name, quantity: item.quantity, unitPrice: lineUnitPrice(item),
+          lineTotal: lineUnitPrice(item) * item.quantity, promo: item.promo || '', note: item.note || '',
+          options: (item.selections || []).map(selection => ({
+            groupName: selection.groupName || (product.options || []).find(group => group.id === selection.groupId)?.name || 'Opción',
+            choiceLabel: selection.choiceLabel || choiceCurrent(product, selection)?.label || '',
+            quantity: Number(selection.quantity || 1)
+          }))
+        };
       }).filter(Boolean);
-      await fetch('/api/orders', {
+      const registration = await fetch('/api/orders', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           orderId: pendingOrder.orderId, name: formData.get('customerName'), phone: formData.get('customerPhone'),
           email: formData.get('customerEmail'), address: formData.get('address'), sector: formData.get('sector'),
           reference: formData.get('reference'), mode: formData.get('orderMode'), notes: formData.get('orderNotes'),
           marketingConsent: formData.get('marketingConsent') === 'yes', marketingChannel: 'whatsapp',
-          items: orderItems, total: Math.max(0, cartProductTotal() - couponDiscount())
+          items: orderItems,
+          productsTotal: cartProductTotal(), discount: couponDiscount(), couponCode: coupon?.code || '',
+          total: Math.max(0, cartProductTotal() - couponDiscount()),
+          rateUsdToVes: rate?.usdVES || null, rateDate: rate?.effectiveDate || ''
         })
       });
+      if (!registration.ok) throw new Error(`El registro respondió ${registration.status}.`);
     } catch (error) { console.warn('No se pudo registrar el pedido en el panel:', error); }
     const url = `https://wa.me/${pendingOrder.number}?text=${encodeURIComponent(buildWhatsAppMessage(pendingOrder.data, pendingOrder.orderId))}`;
     $('#confirmFallbackLink').href = url; $('#confirmFallback').hidden = false;

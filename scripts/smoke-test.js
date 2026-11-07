@@ -12,6 +12,8 @@ const catalog = JSON.parse(fs.readFileSync(catalogPath, 'utf8'));
 const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
 const html = fs.readFileSync(path.join(publicDir, 'index.html'), 'utf8');
 const app = fs.readFileSync(path.join(publicDir, 'app.js'), 'utf8');
+const adminJs = fs.readFileSync(path.join(publicDir, 'admin/admin.js'), 'utf8');
+const adminCss = fs.readFileSync(path.join(publicDir, 'admin/admin.css'), 'utf8');
 const css = fs.readFileSync(path.join(publicDir, 'styles.css'), 'utf8');
 const directCouponsRoute = path.join(root, 'api', 'admin', 'coupons.js');
 
@@ -58,11 +60,13 @@ async function waitForServer(url, child) {
   assert.ok(messageBuilder.includes('DETALLE DEL PEDIDO') && messageBuilder.includes('currencyUSD'), 'La factura de WhatsApp debe incluir el detalle con precios.');
   assert.ok(!messageBuilder.includes('currencyVES') && !messageBuilder.includes('cartGrandTotal'), 'El total final con entrega y los bolívares los confirma Cochi por el chat.');
   assert.ok(html.includes('TRABAJAMOS DE VIERNES A DOMINGO') && html.includes('orderScheduleNote'));
+  assert.ok(html.includes('Quiero recibir ofertas y cupones de Cochi por WhatsApp.'), 'El consentimiento debe especificar el canal de promociones.');
   assert.ok(!html.includes('/admin.html') && !app.includes('supabaseUrl') && !app.includes('/api/bcv') && !app.includes('/api/config'), 'La experiencia pública no debe depender de Admin, Supabase ni APIs de tasa.');
   const htmlIds = new Set([...html.matchAll(/\bid="([^"]+)"/g)].map(match => match[1]));
   const appStaticIds = new Set([...app.matchAll(/\$\('#([A-Za-z][A-Za-z0-9_-]*)'/g)].map(match => match[1]));
   const dynamicIds = new Set(['modalQtyMinus', 'modalQtyValue', 'modalQtyPlus', 'saveProductToCart', 'productDialogError', 'productNote', 'upsellCheck']);
   assert.deepEqual([...appStaticIds].filter(id => !htmlIds.has(id) && !dynamicIds.has(id)), [], 'El frontend no debe buscar elementos inexistentes.');
+  assert.ok(app.includes('productsTotal: cartProductTotal()') && app.includes('lineTotal: lineUnitPrice(item) * item.quantity'), 'Los pedidos deben conservar importes y detalle por línea.');
   ok('Tasa manual, factura de WhatsApp con detalle (sin total final), depósito antes de preparar, horario y referencias HTML validados.');
 
   const port = 4184;
@@ -101,6 +105,27 @@ async function waitForServer(url, child) {
     const setCookie = login.headers.get('set-cookie') || '';
     assert.ok(/HttpOnly/.test(setCookie) && /SameSite=Strict/.test(setCookie), 'La sesión debe ser HttpOnly y SameSite=Strict.');
     const auth = { ...json, Cookie: setCookie.split(';')[0] };
+    // ---- Historial de pedidos, estadísticas y autorización de campañas ----
+    const orderTest = { orderId: 'CH-1107-9876', name: 'Cliente de prueba', phone: '584121234567', email: 'prueba@cochi.test', address: 'Calle 1, casa 2', sector: 'Centro', reference: 'Portón azul', mode: 'delivery', notes: 'Sin cebolla', marketingConsent: true, marketingChannel: 'whatsapp', items: [{ name: 'Shawarma César', quantity: 2, unitPrice: 8, lineTotal: 16, options: [{ groupName: 'Salsa', choiceLabel: 'César', quantity: 1 }], note: 'Extra salsa' }], productsTotal: 16, discount: 1, couponCode: 'COCHI10', total: 15, rateUsdToVes: 900, rateDate: '2026-11-07' };
+    const orderSaved = await fetch(`${base}/api/orders`, { method: 'POST', headers: json, body: JSON.stringify(orderTest) });
+    assert.equal(orderSaved.status, 200, 'El sitio debe guardar el pedido en el historial privado.');
+    const ordersBefore = await (await fetch(`${base}/api/admin/orders`, { headers: auth })).json();
+    const pendingTest = ordersBefore.orders.find(o => o.id === orderTest.orderId);
+    assert.ok(pendingTest && pendingTest.status === 'pending');
+    assert.equal(pendingTest.items[0].options[0].choiceLabel, 'César', 'La comanda debe conservar las opciones del producto.');
+    const orderConfirmed = await fetch(`${base}/api/admin/orders/${orderTest.orderId}`, { method: 'PUT', headers: auth, body: JSON.stringify({ deliveryFeeUSD: 2.5 }) });
+    assert.equal(orderConfirmed.status, 200);
+    const confirmedBody = await orderConfirmed.json();
+    assert.equal(confirmedBody.order.finalTotalUSD, 17.5, 'El total debe sumar delivery una sola vez sobre el subtotal.');
+    assert.equal(confirmedBody.order.status, 'confirmed');
+    const customersBefore = await (await fetch(`${base}/api/admin/customers`, { headers: auth })).json();
+    const testCustomer = customersBefore.customers.find(c => c.phone === orderTest.phone);
+    assert.ok(testCustomer && testCustomer.marketingConsent, 'El cliente con autorización debe aparecer en el panel.');
+    const revoke = await fetch(`${base}/api/admin/customers/${testCustomer.id}`, { method: 'PUT', headers: auth, body: JSON.stringify({ marketingConsent: false }) });
+    assert.equal(revoke.status, 200, 'El panel debe permitir retirar la autorización de promociones.');
+    assert.ok(adminJs.includes("['comandas', 'Comandas']") && adminJs.includes("['estadisticas', 'Estadísticas']") && adminJs.includes('prepareCampaign'), 'El panel debe incluir comandas, estadísticas y campañas.');
+    assert.ok(adminJs.includes('@page{size:58mm auto') && adminJs.includes('Imprimir otra vez') && adminCss.includes('.bar-track'), 'La comanda térmica y las barras estadísticas deben estar preparadas.');
+    ok('Pedidos: historial completo, datos de opciones, confirmación del delivery, total final y revocación de consentimiento validados.');
     assert.ok(fs.existsSync(directCouponsRoute), 'Cupones debe tener una ruta explícita para Vercel.');
     const couponRead = await fetch(`${base}/api/admin/coupons`, { headers: auth });
     assert.equal(couponRead.status, 200, 'El panel debe poder leer los cupones.');

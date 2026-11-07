@@ -1,8 +1,8 @@
 {
   "name": "cochi-experiencia-gastronomica",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
-  "description": "Carta digital visual para Cochi con pedidos por WhatsApp, ofertas al pedir, flyers y panel de administración.",
+  "description": "Carta digital visual para Cochi con pedidos por WhatsApp, ofertas al pedir, flyers y panel de administración, clientes, estadísticas y comandas térmicas.",
   "scripts": {
     "dev": "node scripts/dev-server.js",
     "start": "node scripts/dev-server.js",
