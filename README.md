@@ -1,6 +1,6 @@
 # Cochi — carta digital sencilla (guía para principiantes)
 
-Esta versión está pensada para que el cliente vea el menú, elija sus productos y nos escriba por WhatsApp. El menú público puede funcionar con los archivos JSON del proyecto; para guardar cambios desde el panel en Vercel, conecta Upstash como se explica más abajo. La web no cobra ni confirma pagos: el equipo de Cochi coordina por WhatsApp la disponibilidad, el monto final y el depósito.
+Esta versión está pensada para que el cliente vea el menú, elija sus productos y nos escriba por WhatsApp. El cliente no necesita crear una cuenta. El panel privado de administración sí requiere variables de acceso y una base de datos Upstash conectada en Vercel. La web no cobra ni confirma pagos: el equipo de Cochi coordina por WhatsApp la disponibilidad, el monto final y el depósito.
 
 ## Novedades de esta versión
 
@@ -8,36 +8,41 @@ Esta versión está pensada para que el cliente vea el menú, elija sus producto
 - **Intro con guiño:** dura unos 5 segundos. El cerdito se agacha, guiña con párpado y trazo dibujados en SVG (ver `intro__wink-fx` en `index.html`), salen chispas y las letras de COCHI saltan. El tiempo total se cambia en `setupIntro` de `app.js` (valor 4900). La intro se ve una vez por sesión: para repetirla, abre el sitio en una pestaña nueva o privada.
 - **Sello de actitud:** isotipo centrado en un círculo con el texto "Cochi desde el primer bocado" girando alrededor.
 - **Ofertas al pedir, flyers y panel admin:** ver la sección "Panel de administración" más abajo.
-- **Ticket visual para WhatsApp:** al confirmar, el cliente obtiene una imagen tipo comprobante con sus datos, productos, cantidades, precios y totales estimados. Puede compartirla desde el teléfono o descargarla para adjuntarla. El diseño y los textos se editan desde el panel.
 - **Sin emojis ni símbolos especiales:** los iconos ahora son dibujos SVG (definidos al inicio de `index.html`) y el mensaje de WhatsApp sale en texto limpio.
 - **Mejor en celular:** textos más grandes, botones de al menos 44 px, campos que no hacen zoom en iPhone, ficha de producto que sube desde abajo, botón de continuar siempre visible en el pedido y barra inferior que solo aparece cuando hay productos.
 - **Errores corregidos:** logo de Cochi Dulce invisible (archivos intercambiados), carrito vacío mostrándose junto a los productos, cinta animada con hueco al final, carrito sin animación de cierre, fondo que se movía detrás del carrito, botón "Quiero algo dulce" que no hacía nada y precio del hero escrito a mano (ahora sale de `products.json`).
-
-## Corrección de rutas API para Vercel
-
-Las funciones API están definidas mediante archivos de ruta explícitos dentro de `api/` (por ejemplo `api/admin/session.js` y `api/admin/content.js`). El proyecto usa el preset **Other** y no Next.js, por lo que no debe depender de una ruta comodín anidada como `api/[...path].js`. La lógica compartida permanece en `lib/api.js`.
 
 ## Panel de administración
 
 Desde `tu-sitio.com/admin/` entras con tu correo y contraseña y puedes cambiar, sin tocar código:
 
 - **Tasa y datos:** tasa BCV y su fecha, número de WhatsApp y costo de delivery.
-- **Ticket WhatsApp:** nombre del negocio, título, subtítulos, encabezados, etiquetas de importes, mensajes, color principal y visibilidad del logo, fecha, teléfono, dirección, notas y conversión a bolívares. La vista previa cambia mientras editas.
 - **Productos:** precio, foto, nombre, descripción, categoría, visible/disponible, destacado y "próximamente". También puedes agregar y eliminar productos.
 - **Flyers:** imagen, título, texto, etiqueta (NUEVO, OFERTA...) y a dónde lleva el botón. Salen en la sección "Lo nuevo".
 - **Comentarios:** testimonios de clientes (la sección se oculta si no hay ninguno visible).
-- **Ofertas y avisos:** las sugerencias al pedir (por ejemplo, papas por $1 con cada shawarma; el ahorro se calcula solo) y las frases de la barra roja superior.
+- **Ofertas y avisos:** sugerencias al pedir con activación manual, fechas, franjas horarias y días de la semana; también frases de la barra roja superior.
+- **Clientes:** registro privado en la nube con nombre, teléfono, correo opcional, dirección, sector, historial por teléfono y acceso directo a WhatsApp. Se registra el pedido al pulsar «Enviar por WhatsApp»; el envío y la confirmación siguen siendo gestionados por el equipo.
+- **Comandas:** historial general de pedidos, con opciones, extras, notas, cupón, subtotal y datos de entrega. Cada pedido nuevo queda pendiente hasta que el equipo confirme el costo de delivery y el monto final.
+- **Estadísticas:** ranking de productos, días y horas con más pedidos, franjas de actividad, pedidos pendientes, comandas confirmadas y monto de los pedidos cuyo precio fue confirmado. Puedes filtrar por 7, 30, 90 días o todo el historial.
+- **Campañas por WhatsApp:** selección de clientes que autorizaron recibir promociones y generación de enlaces individuales con mensaje personalizado. Puedes retirar la autorización de un cliente desde el panel. No se envían mensajes automáticamente ni se contacta a quien no autorizó.
+- **Permiso de promociones:** el cliente puede marcar una casilla opcional para aceptar ofertas por WhatsApp. No se marca por defecto.
 
-Todo se guarda con el botón **Guardar cambios**. El sitio lo muestra en segundos. Las fotos se optimizan solas antes de subirse.
+Todo se guarda con el botón **Guardar cambios**. El panel muestra el error concreto del servidor si alguna sección falla; el contenido y los cupones se guardan en operaciones separadas. El sitio lo muestra en segundos. Las fotos se optimizan solas antes de subirse.
 
 ### Probarlo en tu computadora
-1. Copia `.env.example` como `.env` y pon tu correo, una contraseña de al menos 8 caracteres y un `SESSION_SECRET` largo. No subas `.env` a GitHub.
+1. Copia `.env.example` como `.env` y pon tu correo, una contraseña de al menos 8 caracteres y un `SESSION_SECRET` largo.
 2. Ejecuta `npm run dev` y abre `http://localhost:4173/admin/`. Los cambios se guardan en la carpeta `storage/`.
+
+### Si Vercel dice que superaste las 12 funciones del plan Hobby
+
+Este proyecto queda preparado para crear **una sola función de servidor**: `api/_handler.js`. El archivo `vercel.json` envía las direcciones `/api/...` a esa función y conserva la ruta original para que el panel, los pedidos, los clientes, los cupones y las imágenes sigan funcionando. No hace falta cambiar al plan Pro por este motivo.
+
+**Importante:** no crees más archivos `.js` dentro de `api/`. Para agregar o modificar un endpoint, trabaja dentro de `lib/api.js` y mantén la única función `api/_handler.js`. Sube la carpeta completa del proyecto actualizado al repositorio y deja que Vercel genere un despliegue nuevo.
 
 ### Ponerlo en Vercel (paso 3)
 Vercel no permite guardar archivos en el servidor, por eso el panel usa una base de datos gratuita de Upstash:
 1. En tu proyecto de Vercel entra a **Storage**, elige **Upstash for Redis** (plan gratis) y conéctalo al proyecto. Vercel agrega solo las variables `KV_REST_API_URL` y `KV_REST_API_TOKEN` (el proyecto también reconoce `UPSTASH_REDIS_REST_URL` y `UPSTASH_REDIS_REST_TOKEN`).
-2. En **Settings > Environment Variables** agrega `ADMIN_EMAIL`, `ADMIN_PASSWORD` y `SESSION_SECRET`. Usa valores propios y no publiques el archivo `.env`.
+2. En **Settings > Environment Variables** agrega `ADMIN_EMAIL`, `ADMIN_PASSWORD` y `SESSION_SECRET` (los mismos de `.env.example`).
 3. Vuelve a desplegar y entra a `/admin/`.
 
 ### Seguridad y cuidados
@@ -47,11 +52,22 @@ Vercel no permite guardar archivos en el servidor, por eso el panel usa una base
 - Si la base de datos no responde, el sitio sigue funcionando con los valores de `public/data/`.
 - Lo que guardas desde el panel tiene prioridad sobre `public/data/*.json`.
 
+## Comandas, estadísticas y campañas
+
+En el panel privado aparecen tres pestañas nuevas:
+
+- **Comandas:** cada pedido enviado a WhatsApp queda como pendiente. Abre «Agregar delivery y confirmar», escribe el costo real de entrega (en retiro se toma $0), y pulsa «Confirmar monto e imprimir comanda». El sistema guarda el monto y calcula el total final una sola vez. Las comandas confirmadas pueden imprimirse otra vez.
+- **Impresión de prueba:** la vista de impresión usa ancho de papel de 58 mm, texto compacto y contenido en blanco y negro. En el diálogo del navegador selecciona la impresora térmica, el papel/rollo de 58 mm, márgenes mínimos o ninguno y desactiva encabezados y pies de página. La impresión es una prueba desde el navegador; no requiere instalar un servicio de impresión en el servidor.
+- **Estadísticas:** usa la fecha de recepción del pedido y la zona horaria de Caracas. El monto total solo suma pedidos cuyo precio y delivery fueron confirmados por el equipo; los pendientes se muestran por separado. Esta cifra no significa necesariamente que el depósito ya fue recibido.
+- **Clientes y campañas:** marca únicamente a las personas que autorizaron promociones por WhatsApp. El botón «Preparar mensajes» crea un enlace personalizado para cada persona seleccionada; revisa y envía cada conversación desde WhatsApp. «Retirar autorización» excluye al cliente de futuras selecciones.
+
+Los registros se guardan en el mismo almacenamiento Upstash conectado al proyecto de Vercel. No hace falta crear otra cuenta, tabla ni servicio para esta ampliación. En modo local, se guardan dentro de la carpeta `storage/`. Los pedidos anteriores que ya estaban dentro del historial de clientes se incorporan a la vista general; las versiones previas conservaban hasta 30 pedidos por cliente, por lo que el historial más antiguo que ya no existía en ese registro no se puede reconstruir.
+
 ## Etiquetas, WhatsApp flotante, confirmación, fechas y app instalable
 
 - **Etiquetas de producto:** en el panel, dentro de "Editar" de cada producto, escribe una etiqueta corta (Nuevo, Más pedido, Picante...). Sale sobre la foto en el menú y en la ficha del producto.
 - **Botón flotante de WhatsApp:** abre un chat con un mensaje de "tengo una duda". Se acomoda solo para no tapar la barra del pedido. El número sale de los ajustes del panel.
-- **Pantalla de confirmación:** antes de abrir WhatsApp, el cliente revisa su pedido, sus datos y el ticket de imagen. En teléfonos compatibles, "Compartir ticket + pedido" abre el menú nativo para compartir la imagen y el texto; el cliente elige WhatsApp y el chat de Cochi. En equipos sin compartir archivos, la web descarga el PNG y abre el chat con el texto preparado para que se adjunte la imagen manualmente. Si llenas "Datos para el depósito" en la pestaña Tasa y datos, aparecen con un botón para copiarlos. El mensaje de WhatsApp sigue sin llevar precios; los importes están en el ticket.
+- **Pantalla de confirmación:** antes de abrir WhatsApp, el cliente revisa su pedido, sus datos y los pasos que siguen. Si llenas "Datos para el depósito" en la pestaña Tasa y datos, aparecen con un botón para copiarlos. El mensaje de WhatsApp lleva el detalle con precios estimados.
 - **Fechas de inicio y fin:** los flyers y las sugerencias al pedir tienen "Desde" y "Hasta" (opcionales). El panel te dice si están Programados, Vigentes o Vencidos, y el sitio los muestra u oculta solo, con hora de Caracas. Un flyer con fecha final muestra "Válido hasta el...".
 - **Vista previa al compartir:** WhatsApp y las redes necesitan la dirección completa del sitio. En Vercel se toma sola al publicar. Si usas dominio propio, agrega la variable `SITE_URL` (por ejemplo `https://cochi.com`). La imagen está en `public/assets/ui/og-cochi.jpg` (1200 x 630). Si cambias el link, WhatsApp guarda la vista previa anterior un tiempo; puedes forzar la actualización con el depurador de Facebook.
 - **App instalable:** en Android aparece el botón "Instalar Cochi en mi celular" en el pie de página. En iPhone el botón explica cómo usar "Compartir > Añadir a pantalla de inicio". Si no hay internet, se muestra una pantalla de "Sin conexión". La app **nunca guarda precios, menú ni ofertas**: siempre los pide a internet para que no se vea información vieja.
@@ -70,6 +86,12 @@ Se revisó el sitio con una auditoría automática y con pruebas de teclado. Lo 
 
 Pendiente recomendado: probar el sitio con un lector de pantalla real (VoiceOver en iPhone y TalkBack en Android), porque la auditoría automática no sustituye esa prueba. Al subir fotos nuevas desde el panel, el texto alternativo se genera con el nombre del producto o el título del flyer: usa nombres claros.
 
+## Si el panel muestra `404 NOT_FOUND` en Clientes, Comandas o Estadísticas
+
+Ese error significa que Vercel no encontró una ruta API; no demuestra por sí solo que se hayan perdido los datos ni que Upstash esté desconectado. Esta versión usa una sola función (`api/_handler.js`) y una regla de rewrite para atender todos los endpoints bajo `/api/`. Así se evita crear una función independiente por archivo y se mantiene el proyecto dentro del límite del plan Hobby. La lógica de todas las rutas sigue centralizada en `lib/api.js`; clientes, comandas, sesiones, contenido, cupones, imágenes y pedidos conservan sus mismas direcciones. Después de subirla, Vercel debe crear un nuevo despliegue desde el repositorio.
+
+Si el panel deja de mostrar el `404` pero aparece un mensaje indicando que la base de datos no está conectada, entra en **Storage** y confirma que Upstash Redis esté conectado al proyecto. En **Settings > Environment Variables** deben existir `KV_REST_API_URL` y `KV_REST_API_TOKEN` (o sus equivalentes `UPSTASH_REDIS_REST_URL` y `UPSTASH_REDIS_REST_TOKEN`). Después haz **Redeploy**. No pegues esos valores en mensajes ni en GitHub. La versión corregida muestra un `503` claro en vez de mostrar falsamente cero clientes o pedidos cuando no hay almacenamiento conectado.
+
 ## Si Vercel muestra "500 FUNCTION_INVOCATION_FAILED"
 
 Ese mensaje significa que una función del servidor se cayó. Para saber cuál y por qué:
@@ -81,11 +103,11 @@ Ese mensaje significa que una función del servidor se cayó. Para saber cuál y
 ## Lo más importante
 
 - El cliente explora el menú y añade productos al pedido.
-- El pedido se envía a WhatsApp con los productos, cantidades, opciones y datos de entrega, pero **sin precios ni monto final dentro del mensaje**.
+- El pedido se envía a WhatsApp con los productos, cantidades, opciones y datos de entrega, con **factura en texto limpio: número de pedido, precio por producto y descuento de cupón**. El total final con entrega y el monto en Bs. los da Cochi por el chat.
 - El equipo de Cochi confirma por WhatsApp el monto, el costo de entrega y cómo pagar.
 - **La preparación comienza únicamente después de recibir el depósito acordado.**
 - La web acepta solicitudes de viernes a domingo. Fuera de esos días, el cliente puede mirar el menú, pero el botón para continuar estará desactivado.
-- Los productos y la tasa inicial se leen de archivos sencillos. Para guardar cambios desde el panel en Vercel, conecta Upstash como se explica arriba.
+- Los productos y la tasa se pueden editar desde el panel privado; los archivos de `public/data/` sirven como valores iniciales o respaldo cuando no hay contenido guardado.
 
 ## Cómo cambiar la tasa del dólar (lo más frecuente)
 
@@ -170,8 +192,23 @@ cochi-proyecto/
 │   │   ├── settings.json   # WhatsApp y tasa manual
 │   │   └── products.json   # Menú, descripciones y precios
 │   └── assets/             # Logos, isotipos e imágenes
-├── api/[...path].js        # Función de Vercel para /api (panel admin y contenido)
-├── lib/                    # Lógica de la API: sesión, validación y almacenamiento
+├── api/_handler.js        # Única función API; vercel.json desvía aquí todos los /api/*
+├── lib/api.js              # Lógica única: sesión, validación y almacenamiento
 └── scripts/dev-server.js   # Servidor SOLO para probar en tu computadora
 └── vercel.json             # Reglas de publicación
 ```
+
+## Cupones (prueba)
+
+En el panel, pestaña **Cupones**: interruptor general, y por cada cupón: código, % o monto fijo, usos máximos, pedido mínimo, un uso por cliente, teléfono exclusivo y fechas. Los cupones viven en una clave privada de la base de datos (no salen en el contenido público). Todas las rutas del menú y del panel pasan por la única función de API de Vercel; `lib/api.js` decide qué hacer según la dirección y el método de cada solicitud. El uso se cuenta al pulsar "Enviar por WhatsApp". Requiere la base de datos Upstash conectada.
+
+## Horario de pedidos
+
+En el panel, pestaña **Horario**: cada día se abre o se cierra, con hora de apertura y cierre (hora de Caracas), y hay un interruptor para **pausar pedidos** de inmediato. Los textos del sitio que dicen cuándo se piden pedidos y la factura se actualizan solos. Las frases de la barra roja se editan en "Ofertas y avisos".
+
+
+### Registro de clientes y ofertas por horario
+
+Los pedidos enviados a WhatsApp se registran en la base de datos del servidor. El registro de clientes se encuentra en la pestaña **Clientes** del panel y solo se consulta después de iniciar sesión. El teléfono es obligatorio para asociar pedidos; el correo es opcional. La casilla de autorización de promociones está desmarcada por defecto. No uses los datos para campañas si la persona no dio su autorización.
+
+En **Ofertas y avisos**, cada sugerencia puede limitarse a una hora de inicio y fin y a días concretos. Si dejas las horas vacías y no marcas días, la sugerencia conserva su disponibilidad habitual. El interruptor **Activa** permite pausarla sin eliminarla.

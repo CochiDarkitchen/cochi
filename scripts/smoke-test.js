@@ -15,15 +15,13 @@ const app = fs.readFileSync(path.join(publicDir, 'app.js'), 'utf8');
 const adminJs = fs.readFileSync(path.join(publicDir, 'admin/admin.js'), 'utf8');
 const adminCss = fs.readFileSync(path.join(publicDir, 'admin/admin.css'), 'utf8');
 const css = fs.readFileSync(path.join(publicDir, 'styles.css'), 'utf8');
-const directCouponsRoute = path.join(root, 'api', 'admin', 'coupons.js');
-const explicitVercelRoutes = [
-  'api/health.js', 'api/content.js', 'api/orders.js',
-  'api/admin/session.js', 'api/admin/login.js', 'api/admin/logout.js',
-  'api/admin/content.js', 'api/admin/coupons.js', 'api/admin/customers.js',
-  'api/admin/orders.js', 'api/admin/upload.js',
-  'api/admin/customers/[customerId].js', 'api/admin/orders/[orderId].js',
-  'api/coupon/check.js', 'api/coupon/redeem.js', 'api/img/[id].js'
-];
+const singleApiRoute = path.join(root, 'api', '_handler.js');
+function listApiJavaScriptFiles(directory) {
+  return fs.readdirSync(directory, { withFileTypes: true }).flatMap(entry => {
+    const fullPath = path.join(directory, entry.name);
+    return entry.isDirectory() ? listApiJavaScriptFiles(fullPath) : (entry.isFile() && entry.name.endsWith('.js') ? [fullPath] : []);
+  });
+}
 
 function ok(message) { console.log(`OK: ${message}`); }
 async function waitForServer(url, child) {
@@ -134,13 +132,23 @@ async function waitForServer(url, child) {
     assert.ok(adminJs.includes("['comandas', 'Comandas']") && adminJs.includes("['estadisticas', 'Estadísticas']") && adminJs.includes('prepareCampaign'), 'El panel debe incluir comandas, estadísticas y campañas.');
     assert.ok(adminJs.includes('@page{size:58mm auto') && adminJs.includes('Imprimir otra vez') && adminCss.includes('.bar-track'), 'La comanda térmica y las barras estadísticas deben estar preparadas.');
     ok('Pedidos: historial completo, datos de opciones, confirmación del delivery, total final y revocación de consentimiento validados.');
-    assert.ok(fs.existsSync(directCouponsRoute), 'Cupones debe tener una ruta explícita para Vercel.');
-    for (const routeFile of explicitVercelRoutes) {
-      assert.ok(fs.existsSync(path.join(root, routeFile)), `Vercel necesita la ruta explícita ${routeFile}.`);
-    }
-    const vercelAdapter = require(path.join(root, 'lib/vercel-handler.js'));
-    assert.equal(typeof vercelAdapter.vercelHandler, 'function', 'Las rutas explícitas comparten un adaptador válido.');
-    ok('Enrutamiento Vercel: endpoints explícitos de clientes, comandas, sesiones, contenido, promociones y rutas dinámicas presentes.');
+    const apiFiles = listApiJavaScriptFiles(path.join(root, 'api'));
+    assert.deepEqual(apiFiles.map(file => path.relative(root, file).split(path.sep).join('/')), ['api/_handler.js'], 'En el plan Hobby debe existir una sola función API.');
+    const vercelEntry = require(singleApiRoute);
+    assert.equal(typeof vercelEntry, 'function', 'La única función API de Vercel debe exportar un manejador válido.');
+    const simulatedVercel = require('node:http').createServer((req, res) => vercelEntry(req, res));
+    await new Promise(resolve => simulatedVercel.listen(4185, '127.0.0.1', resolve));
+    try {
+      const routedHealth = await fetch('http://127.0.0.1:4185/api/_handler?__cochi_path=health');
+      assert.equal(routedHealth.status, 200, 'La ruta reescrita /api/health debe llegar a la función única.');
+      assert.equal((await routedHealth.json()).ok, true);
+      const routedSession = await fetch('http://127.0.0.1:4185/api/_handler?__cochi_path=admin%2Fsession');
+      assert.equal(routedSession.status, 200, 'Las rutas API de varios niveles deben llegar a la función única.');
+      assert.equal((await routedSession.json()).authenticated, false);
+    } finally { await new Promise(resolve => simulatedVercel.close(resolve)); }
+    const vercelConfig = JSON.parse(fs.readFileSync(path.join(root, 'vercel.json'), 'utf8'));
+    assert.ok(vercelConfig.rewrites.some(rule => rule.source === '/api/:path*' && rule.destination === '/api/_handler?__cochi_path=:path*'), 'Vercel debe redirigir todos los endpoints al manejador único.');
+    ok('Enrutamiento Vercel: una sola función y rewrite probado para rutas simples y anidadas de la API.');
     const couponRead = await fetch(`${base}/api/admin/coupons`, { headers: auth });
     assert.equal(couponRead.status, 200, 'El panel debe poder leer los cupones.');
     assert.deepEqual((await couponRead.json()).coupons, { enabled: false, coupons: [] });
