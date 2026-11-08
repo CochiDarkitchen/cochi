@@ -89,6 +89,10 @@
   "outputDirectory": "public",
   "rewrites": [
     {
+      "source": "/admin",
+      "destination": "/admin/index.html"
+    },
+    {
       "source": "/api/:path*",
       "destination": "/api/_handler?__cochi_path=:path*"
     }
