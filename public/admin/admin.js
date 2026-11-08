@@ -3,7 +3,7 @@
   const $ = (s, r = document) => r.querySelector(s);
   const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const TABS = [['tasa', 'Tasa y datos'], ['horario', 'Horario'], ['productos', 'Productos'], ['flyers', 'Flyers'], ['comentarios', 'Comentarios'], ['ofertas', 'Ofertas y avisos'], ['cupones', 'Cupones'], ['comandas', 'Comandas'], ['estadisticas', 'Estadísticas'], ['clientes', 'Clientes']];
-  let data = null, tab = 'tasa', dirty = false, openSlug = null, query = '', storage = 'file', fromDefaults = false, toastTimer = null, customers = [], customerQuery = '', orders = [], openOrderId = null, ordersLimit = 50, statsPeriod = '30', selectedCustomerIds = new Set(), campaignText = '¡Hola {nombre}! Tenemos novedades en Cochi. Queremos compartirte nuestros nuevos platillos y promociones. Escríbenos por aquí para conocerlos.', campaignLinksReady = false;
+  let data = null, tab = 'tasa', dirty = false, openSlug = null, query = '', storage = 'file', fromDefaults = false, toastTimer = null, customers = [], customerQuery = '', orders = [], feeDrafts = {}, preview = null, modalReturnFocus = null, currentReceiptHtml = '', ordersLimit = 50, statsPeriod = '30', selectedCustomerIds = new Set(), campaignText = '¡Hola {nombre}! Tenemos novedades en Cochi. Queremos compartirte nuestros nuevos platillos y promociones. Escríbenos por aquí para conocerlos.', campaignLinksReady = false;
 
   async function api(path, options = {}) {
     const response = await fetch(`/api/admin/${path}`, { credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, ...options });
@@ -22,26 +22,116 @@
   const caracasHour = value => Number(new Intl.DateTimeFormat('en-US', { timeZone: 'America/Caracas', hour: '2-digit', hourCycle: 'h23' }).format(new Date(value)));
   const waUrl = (phone, message = '') => `https://wa.me/${String(phone || '').replace(/\D/g, '')}${message ? `?text=${encodeURIComponent(message)}` : ''}`;
   const moneyText = n => `$${money(n)}`;
-  function printReceipt(order) {
-    const printWindow = window.open('', '_blank', 'width=380,height=760');
-    if (!printWindow) { toast('El navegador bloqueó la ventana de impresión. Permite ventanas emergentes para imprimir.', true); return; }
-    writeReceipt(printWindow, order);
+  /* ---------- Comanda: cálculo, vista previa e impresión ---------- */
+  const round2 = n => Math.round((Number(n) || 0) * 100) / 100;
+  const fmtBs = n => new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(n) || 0);
+  const orderBase = order => Math.max(0, Number(order.total ?? order.productsTotal ?? 0) || 0);
+  const orderRate = order => Number(order.rateUsdToVes || data?.settings?.usdToVes || 0);
+  // Devuelve el monto como número (0 a 999) o null si está vacío o es inválido.
+  function parseFee(raw) {
+    if (raw === null || raw === undefined || String(raw).trim() === '') return null;
+    const n = Number(raw);
+    return Number.isFinite(n) && n >= 0 && n <= 999 ? round2(n) : null;
   }
-  function writeReceipt(printWindow, order) {
+  // Mismas cuentas que hace el servidor al confirmar: total con descuento + delivery (retiro = 0).
+  function draftOrder(order, fee) {
+    const deliveryFeeUSD = order.mode === 'pickup' ? 0 : round2(fee);
+    return { ...order, deliveryFeeUSD, finalTotalUSD: round2(orderBase(order) + deliveryFeeUSD) };
+  }
+  // Lo escrito en el campo se conserva aunque la lista se vuelva a dibujar.
+  const feeValue = order => feeDrafts[order.id] !== undefined ? feeDrafts[order.id] : String(order.deliveryFeeUSD ?? data.settings.deliveryFeeUSD ?? '');
+  function feeSummaryHtml(order, fee) {
+    const ok = fee !== null, total = ok ? round2(orderBase(order) + fee) : 0, rate = orderRate(order);
+    return `<span>Delivery</span><strong>${ok ? moneyText(fee) : '—'}</strong><span class="fee-total">Total a cobrar</span><strong class="fee-total">${ok ? moneyText(total) : '—'}</strong>${rate > 0 ? `<span class="muted">En bolívares (tasa ${money(rate)})</span><strong class="muted">${ok ? `Bs. ${fmtBs(total * rate)}` : '—'}</strong>` : ''}`;
+  }
+  // Actualiza el total y los avisos de una comanda mientras se escribe, sin redibujar toda la lista.
+  function syncFee(input) {
+    const id = input.dataset.orderFee, order = orders.find(o => String(o.id) === id); if (!order) return;
+    feeDrafts[id] = input.value;
+    const fee = parseFee(input.value);
+    const summary = document.querySelector(`[data-fee-summary="${id}"]`); if (summary) summary.innerHTML = feeSummaryHtml(order, fee);
+    const hint = document.querySelector(`[data-fee-hint="${id}"]`); if (hint) hint.hidden = fee !== null;
+    if (fee === null) input.setAttribute('aria-invalid', 'true'); else input.removeAttribute('aria-invalid');
+  }
+
+  // Documento completo de la comanda (58 mm). Es el mismo que se ve en la vista previa y el que se imprime.
+  function receiptHtml(order) {
     const mode = order.mode === 'pickup' ? 'RETIRO' : 'DELIVERY';
     const items = (order.items || []).map(item => {
       const options = (item.options || []).map(option => `${esc(option.groupName)}: ${esc(option.choiceLabel)}${Number(option.quantity) > 1 ? ` x${esc(option.quantity)}` : ''}`).join('<br>');
-      const note = item.note ? `<br><em>Nota: ${esc(item.note)}</em>` : '';
+      const note = item.note ? `<div class="sub"><em>Nota: ${esc(item.note)}</em></div>` : '';
       return `<div class="line"><div class="item-name">${esc(item.quantity)} x ${esc(item.name)}</div><div class="amount">${moneyText(item.lineTotal ?? (Number(item.unitPrice || 0) * Number(item.quantity || 1)))}</div>${options ? `<div class="sub">${options}</div>` : ''}${note}</div>`;
     }).join('');
     const finalTotal = Number(order.finalTotalUSD ?? order.total ?? 0);
-    const rate = Number(order.rateUsdToVes || data?.settings?.usdToVes || 0);
+    const rate = orderRate(order);
     const rateDate = order.rateDate || data?.settings?.exchangeRateDate || '';
-    const bolivares = rate > 0 ? `Bs. ${new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(finalTotal * rate)}` : '';
-    const html = `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Comanda ${esc(order.id)}</title><style>
-      @page{size:58mm auto;margin:2mm}*{box-sizing:border-box}html,body{width:54mm;margin:0;padding:0;background:#fff;color:#000;font-family:Arial,sans-serif;font-size:10px;line-height:1.35}body{padding:1mm}.center{text-align:center}.brand{font-size:21px;font-weight:900;letter-spacing:1px}.muted{font-size:9px}.rule{border:0;border-top:1px dashed #000;margin:7px 0}.meta{display:flex;justify-content:space-between;gap:4px}.line{padding:4px 0;border-bottom:1px dotted #777}.item-name{font-weight:700;padding-right:40px}.amount{float:right;font-weight:700;margin-top:-14px}.sub{font-size:9px;padding-top:2px}.totals{display:grid;gap:3px}.total{font-size:14px;font-weight:900}.address{overflow-wrap:anywhere}.footer{margin-top:8px;text-align:center;font-size:9px}
-      </style></head><body><header class="center"><div class="brand">COCHI</div><div class="muted">DARK KITCHEN · COMANDA</div></header><hr class="rule"><div class="meta"><strong>${esc(order.id)}</strong><span>${esc(dateTime(order.createdAt))}</span></div><p><strong>CLIENTE:</strong> ${esc(order.name)}<br><strong>CONTACTO:</strong> ${esc(order.phone)}<br><strong>MODALIDAD:</strong> ${mode}</p>${order.mode !== 'pickup' ? `<p class="address"><strong>DIRECCIÓN:</strong> ${esc(order.address || 'No indicada')}<br><strong>SECTOR:</strong> ${esc(order.sector || '—')}<br><strong>REFERENCIA:</strong> ${esc(order.reference || '—')}</p>` : ''}<hr class="rule"><div><strong>DETALLE DEL PEDIDO</strong></div>${items || '<p>Sin detalle de productos.</p>'}<hr class="rule"><div class="totals"><div class="meta"><span>Productos</span><strong>${moneyText(order.productsTotal ?? (Number(order.total || 0) + Number(order.discount || 0)))}</strong></div>${Number(order.discount) > 0 ? `<div class="meta"><span>Descuento ${esc(order.couponCode || '')}</span><strong>-${moneyText(order.discount)}</strong></div>` : ''}<div class="meta"><span>Productos con descuento</span><strong>${moneyText(order.total)}</strong></div><div class="meta"><span>Delivery</span><strong>${moneyText(order.deliveryFeeUSD || 0)}</strong></div><hr class="rule"><div class="meta total"><span>TOTAL</span><strong>${moneyText(finalTotal)}</strong></div>${bolivares ? `<div class="meta"><span>Estimado en bolívares</span><strong>${esc(bolivares)}</strong></div><div class="muted">Tasa: ${money(rate)} Bs./USD · ${esc(rateDate)}</div>` : ''}</div>${order.notes ? `<hr class="rule"><strong>NOTAS:</strong><p>${esc(order.notes)}</p>` : ''}<hr class="rule"><div class="footer">Gracias por pedir en Cochi.<br>La actitud tiene sabor.</div><script>requestAnimationFrame(()=>window.print());window.addEventListener('afterprint',()=>window.close());<\/script></body></html>`;
-    printWindow.document.open(); printWindow.document.write(html); printWindow.document.close();
+    const bolivares = rate > 0 ? `Bs. ${fmtBs(finalTotal * rate)}` : '';
+    return `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Comanda ${esc(order.id)}</title><style>
+      @page{size:58mm auto;margin:2mm}*{box-sizing:border-box}html,body{width:54mm;margin:0;padding:0;background:#fff;color:#000;font-family:Arial,sans-serif;font-size:10px;line-height:1.35}body{padding:1mm}.center{text-align:center}.brand{font-size:21px;font-weight:900;letter-spacing:1px}.muted{font-size:9px}.rule{border:0;border-top:1px dashed #000;margin:7px 0}.meta{display:flex;justify-content:space-between;gap:4px}.line{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:6px;padding:4px 0;border-bottom:1px dotted #777}.item-name{font-weight:700;overflow-wrap:anywhere}.amount{font-weight:700;white-space:nowrap;text-align:right}.sub{grid-column:1/-1;font-size:9px;padding-top:2px;overflow-wrap:anywhere}.totals{display:grid;gap:3px}.total{font-size:14px;font-weight:900}.address{overflow-wrap:anywhere}.footer{margin-top:8px;text-align:center;font-size:9px}
+      @media screen{html{width:58mm;padding:2mm}body{width:54mm}}
+      </style></head><body><header class="center"><div class="brand">COCHI</div><div class="muted">DARK KITCHEN · COMANDA</div></header><hr class="rule"><div class="meta"><strong>${esc(order.id)}</strong><span>${esc(dateTime(order.createdAt))}</span></div><p><strong>CLIENTE:</strong> ${esc(order.name)}<br><strong>CONTACTO:</strong> ${esc(order.phone)}<br><strong>MODALIDAD:</strong> ${mode}</p>${order.mode !== 'pickup' ? `<p class="address"><strong>DIRECCIÓN:</strong> ${esc(order.address || 'No indicada')}<br><strong>SECTOR:</strong> ${esc(order.sector || '—')}<br><strong>REFERENCIA:</strong> ${esc(order.reference || '—')}</p>` : ''}<hr class="rule"><div><strong>DETALLE DEL PEDIDO</strong></div>${items || '<p>Sin detalle de productos.</p>'}<hr class="rule"><div class="totals"><div class="meta"><span>Productos</span><strong>${moneyText(order.productsTotal ?? (Number(order.total || 0) + Number(order.discount || 0)))}</strong></div>${Number(order.discount) > 0 ? `<div class="meta"><span>Descuento ${esc(order.couponCode || '')}</span><strong>-${moneyText(order.discount)}</strong></div>` : ''}<div class="meta"><span>Productos con descuento</span><strong>${moneyText(order.total)}</strong></div><div class="meta"><span>Delivery</span><strong>${moneyText(order.deliveryFeeUSD || 0)}</strong></div><hr class="rule"><div class="meta total"><span>TOTAL</span><strong>${moneyText(finalTotal)}</strong></div>${bolivares ? `<div class="meta"><span>Estimado en bolívares</span><strong>${esc(bolivares)}</strong></div><div class="muted">Tasa: ${money(rate)} Bs./USD · ${esc(rateDate)}</div>` : ''}</div>${order.notes ? `<hr class="rule"><strong>NOTAS:</strong><p>${esc(order.notes)}</p>` : ''}<hr class="rule"><div class="footer">Gracias por pedir en Cochi.<br>La actitud tiene sabor.</div></body></html>`;
+  }
+
+  /* Ventana de vista previa: muestra la comanda en un marco y la imprime desde ahí mismo,
+     así lo que se ve es exactamente lo que sale en papel y el navegador no bloquea ventanas emergentes. */
+  function loadFrame(html) {
+    const frame = $('#receiptFrame'); currentReceiptHtml = html;
+    return new Promise(resolve => {
+      frame.onload = () => {
+        frame.onload = null; sizeFrame();
+        // Si el foco queda dentro de la comanda (p. ej. después de imprimir), Esc debe seguir cerrando la ventana.
+        frame.contentDocument?.addEventListener('keydown', event => { if (event.key === 'Escape') { event.preventDefault(); closePreview(); } });
+        resolve();
+      };
+      frame.srcdoc = html;
+    });
+  }
+  function sizeFrame() {
+    const frame = $('#receiptFrame'), wrap = $('#paperWrap'), doc = frame.contentDocument; if (!doc?.documentElement) return;
+    frame.style.height = '0px';
+    const height = Math.ceil(doc.documentElement.scrollHeight);
+    frame.style.height = `${height}px`;
+    wrap.style.height = `${Math.ceil(height * (parseFloat(getComputedStyle(wrap).getPropertyValue('--zoom')) || 1.5))}px`;
+  }
+  function paintFoot() {
+    const order = orders.find(o => String(o.id) === preview.id), confirmed = order?.status === 'confirmed', busy = preview.saving ? 'disabled' : '';
+    $('#modalFoot').innerHTML = confirmed
+      ? `<button type="button" class="btn" data-act="closePreview">Cerrar</button><button type="button" class="btn btn--red" data-act="printPreview">${preview.printed ? 'Imprimir otra vez' : 'Imprimir'}</button>`
+      : `<button type="button" class="btn" data-act="closePreview" ${busy}>Volver y editar</button><button type="button" class="btn btn--red" data-act="confirmAndPrint" ${busy}>${preview.saving ? 'Guardando…' : 'Confirmar e imprimir'}</button>`;
+  }
+  function paintNote(order, shown) {
+    const confirmed = order.status === 'confirmed', pickup = order.mode === 'pickup';
+    $('#modalTitle').textContent = `Vista previa · ${order.id}`;
+    $('#modalNote').innerHTML = confirmed
+      ? `<span class="chip chip--on">Confirmada</span><span>Total guardado: <strong>${moneyText(shown.finalTotalUSD)}</strong>${pickup ? '' : ` (delivery ${moneyText(shown.deliveryFeeUSD)})`}</span>`
+      : `<span class="chip chip--soon">Aún no confirmada</span><span>${pickup ? 'Retiro: sin delivery.' : `Delivery <strong>${moneyText(shown.deliveryFeeUSD)}</strong>.`} Total <strong>${moneyText(shown.finalTotalUSD)}</strong>. Se guarda al confirmar.</span>`;
+  }
+  async function openPreview(order, fee) {
+    preview = { id: String(order.id), fee, saving: false, printed: false };
+    modalReturnFocus = document.activeElement;
+    const shown = order.status === 'confirmed' ? order : draftOrder(order, fee);
+    $('#receiptModal').hidden = false; document.body.classList.add('modal-open');
+    paintNote(order, shown); paintFoot();
+    await loadFrame(receiptHtml(shown));
+    $('#modalFoot .btn--red')?.focus();
+  }
+  function closePreview() {
+    if (!preview || preview.saving) return;
+    const id = preview.id, back = modalReturnFocus; preview = null; modalReturnFocus = null;
+    $('#receiptModal').hidden = true; document.body.classList.remove('modal-open');
+    const frame = $('#receiptFrame'); frame.onload = null; frame.srcdoc = '';
+    (back && document.contains(back) ? back : document.querySelector(`[data-act="previewOrder"][data-order-id="${id}"]`))?.focus();
+  }
+  function printFrame() {
+    const frame = $('#receiptFrame');
+    try { frame.contentWindow.focus(); frame.contentWindow.print(); return true; }
+    catch {
+      // Algunos navegadores del teléfono no imprimen desde un marco: se abre la comanda en una ventana aparte.
+      const win = window.open('', '_blank', 'width=380,height=760');
+      if (!win) { toast('No se pudo abrir la impresión. Permite las ventanas emergentes e inténtalo otra vez.', true); return false; }
+      win.document.open(); win.document.write(currentReceiptHtml.replace('</body>', '<script>requestAnimationFrame(()=>window.print());<\/script></body>')); win.document.close();
+      return true;
+    }
   }
   const bs = usd => new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format((Number(usd) || 0) * (Number(data.settings.usdToVes) || 0));
   function markDirty(value = true) {
@@ -149,13 +239,26 @@
       const pending = orders.filter(o => o.status !== 'confirmed');
       const confirmed = orders.filter(o => o.status === 'confirmed');
       const cards = orders.slice(0, ordersLimit).map(order => {
-        const opened = openOrderId === order.id;
+        const isConfirmed = order.status === 'confirmed';
         const isPickup = order.mode === 'pickup';
+        const id = esc(order.id);
         const items = (order.items || []).map(item => `<div class="order-line"><strong>${esc(item.quantity)} × ${esc(item.name)}</strong><span>${moneyText(item.lineTotal ?? Number(item.unitPrice || 0) * Number(item.quantity || 1))}</span>${(item.options || []).length ? `<small>${item.options.map(o => `${esc(o.groupName)}: ${esc(o.choiceLabel)}${Number(o.quantity) > 1 ? ` ×${esc(o.quantity)}` : ''}`).join(' · ')}</small>` : ''}${item.note ? `<small>Nota: ${esc(item.note)}</small>` : ''}</div>`).join('');
-        const feeDefault = data.settings.deliveryFeeUSD ?? '';
-        return `<article class="item order-card"><div class="order-head"><div><h3>${esc(order.id || 'Comanda')}</h3><p class="muted">${dateTime(order.createdAt)} · ${isPickup ? 'Retiro' : 'Delivery'}</p></div><span class="chip chip--${order.status === 'confirmed' ? 'on' : 'soon'}">${order.status === 'confirmed' ? 'Confirmada' : 'Pendiente'}</span></div><div class="order-customer"><strong>${esc(order.name)}</strong> · ${esc(order.phone)}${order.address ? `<br>${esc(order.address)} · ${esc(order.sector || '')}` : ''}${order.reference ? `<br>Referencia: ${esc(order.reference)}` : ''}</div><div class="order-items">${items || '<p class="muted">No hay detalle de productos.</p>'}</div><div class="order-totals"><span>Productos</span><strong>${moneyText(order.productsTotal ?? (Number(order.total || 0) + Number(order.discount || 0)))}</strong>${Number(order.discount) > 0 ? `<span>Cupón ${esc(order.couponCode || '')}</span><strong>-${moneyText(order.discount)}</strong>` : ''}<span>Subtotal</span><strong>${moneyText(order.total ?? order.productsTotal)}</strong>${order.status === 'confirmed' ? `<span>Delivery</span><strong>${moneyText(order.deliveryFeeUSD || 0)}</strong><span>Total confirmado</span><strong>${moneyText(order.finalTotalUSD)}</strong>` : ''}</div>${order.notes ? `<p class="preview"><strong>Notas:</strong> ${esc(order.notes)}</p>` : ''}<div class="item__bar">${order.status === 'confirmed' ? `<button type="button" class="btn btn--small" data-act="printOrder" data-order-id="${esc(order.id)}">Imprimir otra vez</button>` : `<button type="button" class="btn btn--small" data-act="manageOrder" data-order-id="${esc(order.id)}">${opened ? 'Cerrar confirmación' : 'Agregar delivery y confirmar'}</button>`}</div>${opened && order.status !== 'confirmed' ? `<div class="order-confirm"><p class="card__intro">Revisa el monto con el cliente. El pedido se registró como pendiente; al confirmar, guardaremos el delivery y el total definitivo.</p>${isPickup ? '<p class="preview">Retiro en Cochi: no se suma costo de delivery.</p>' : `<label class="field">Costo de delivery en USD<input type="number" id="fee-${esc(order.id)}" data-order-fee="${esc(order.id)}" min="0" max="999" step="0.01" inputmode="decimal" value="${esc(order.deliveryFeeUSD ?? feeDefault)}" placeholder="Ej. 2.00" required></label>`}<button type="button" class="btn btn--red" data-act="confirmOrder" data-order-id="${esc(order.id)}">Confirmar monto e imprimir comanda</button></div>` : ''}</article>`;
+        const previewBtn = `<button type="button" class="btn btn--red" data-act="previewOrder" data-order-id="${id}">Vista previa de la comanda</button>`;
+        let feeBox = '';
+        if (!isConfirmed && isPickup) {
+          feeBox = `<div class="fee-box"><div class="fee-box__head"><h4>Retiro en Cochi</h4></div><p class="muted">No se cobra delivery. Total a cobrar: <strong>${moneyText(orderBase(order))}</strong></p>${previewBtn}</div>`;
+        } else if (!isConfirmed) {
+          const raw = feeValue(order), fee = parseFee(raw);
+          feeBox = `<div class="fee-box"><div class="fee-box__head"><h4>Delivery</h4><small>Costo real acordado con el cliente</small></div>
+            <div class="fee-row"><button type="button" class="btn fee-step" data-act="feeStep" data-order-id="${id}" data-step="-0.5" aria-label="Restar 0,50 al delivery">−</button>
+            <label class="fee-input"><span class="sr-only">Costo de delivery en USD</span><b aria-hidden="true">$</b><input type="number" data-order-fee="${id}" min="0" max="999" step="0.01" inputmode="decimal" value="${esc(raw)}" placeholder="0.00" ${fee === null ? 'aria-invalid="true"' : ''}></label>
+            <button type="button" class="btn fee-step" data-act="feeStep" data-order-id="${id}" data-step="0.5" aria-label="Sumar 0,50 al delivery">+</button></div>
+            <div class="fee-summary" data-fee-summary="${id}">${feeSummaryHtml(order, fee)}</div>
+            <p class="fee-hint" data-fee-hint="${id}" ${fee === null ? '' : 'hidden'}>Escribe el costo del delivery (usa 0 si no se cobra).</p>${previewBtn}</div>`;
+        }
+        return `<article class="item order-card"><div class="order-head"><div><h3>${esc(order.id || 'Comanda')}</h3><p class="muted">${dateTime(order.createdAt)} · ${isPickup ? 'Retiro' : 'Delivery'}</p></div><span class="chip chip--${isConfirmed ? 'on' : 'soon'}">${isConfirmed ? 'Confirmada' : 'Pendiente'}</span></div><div class="order-customer"><strong>${esc(order.name)}</strong> · ${esc(order.phone)}${order.address ? `<br>${esc(order.address)} · ${esc(order.sector || '')}` : ''}${order.reference ? `<br>Referencia: ${esc(order.reference)}` : ''}</div><div class="order-items">${items || '<p class="muted">No hay detalle de productos.</p>'}</div><div class="order-totals"><span>Productos</span><strong>${moneyText(order.productsTotal ?? (Number(order.total || 0) + Number(order.discount || 0)))}</strong>${Number(order.discount) > 0 ? `<span>Cupón ${esc(order.couponCode || '')}</span><strong>-${moneyText(order.discount)}</strong>` : ''}<span>Subtotal</span><strong>${moneyText(order.total ?? order.productsTotal)}</strong>${isConfirmed ? `<span>Delivery</span><strong>${moneyText(order.deliveryFeeUSD || 0)}</strong><span>Total confirmado</span><strong>${moneyText(order.finalTotalUSD)}</strong>` : ''}</div>${order.notes ? `<p class="preview"><strong>Notas:</strong> ${esc(order.notes)}</p>` : ''}${feeBox}${isConfirmed ? `<div class="item__bar"><button type="button" class="btn btn--small" data-act="previewOrder" data-order-id="${id}">Vista previa e imprimir</button></div>` : ''}</article>`;
       }).join('');
-      return `<section class="card"><h2>Comandas y pedidos</h2><p class="card__intro">Cada pedido que el cliente envía a WhatsApp aparece aquí como pendiente. Añade el costo real de delivery, confirma el total y genera una comanda de prueba para impresora térmica de 58 mm. Confirmar aquí registra el monto acordado, no el pago recibido.</p><div class="metric-grid"><div class="metric"><strong>${orders.length}</strong><span>Pedidos registrados</span></div><div class="metric"><strong>${pending.length}</strong><span>Pendientes</span></div><div class="metric"><strong>${confirmed.length}</strong><span>Confirmados</span></div></div><button type="button" class="btn btn--small" data-act="refreshOrders">Actualizar pedidos</button></section>${cards || '<section class="card"><p class="muted">Todavía no hay pedidos. Cuando un cliente envíe su solicitud a WhatsApp, aparecerá aquí.</p></section>'}${orders.length > ordersLimit ? `<button type="button" class="btn btn--small" data-act="loadMoreOrders">Mostrar ${Math.min(50, orders.length - ordersLimit)} pedidos más</button>` : ''}`;
+      return `<section class="card"><h2>Comandas y pedidos</h2><p class="card__intro">Cada pedido que el cliente envía a WhatsApp aparece aquí como pendiente. Escribe el costo real del delivery, revisa cómo quedará la comanda en la vista previa y confírmala para imprimirla en la impresora térmica de 58 mm. Confirmar aquí registra el monto acordado, no el pago recibido.</p><div class="metric-grid"><div class="metric"><strong>${orders.length}</strong><span>Pedidos registrados</span></div><div class="metric"><strong>${pending.length}</strong><span>Pendientes</span></div><div class="metric"><strong>${confirmed.length}</strong><span>Confirmados</span></div></div><button type="button" class="btn btn--small" data-act="refreshOrders">Actualizar pedidos</button></section>${cards || '<section class="card"><p class="muted">Todavía no hay pedidos. Cuando un cliente envíe su solicitud a WhatsApp, aparecerá aquí.</p></section>'}${orders.length > ordersLimit ? `<button type="button" class="btn btn--small" data-act="loadMoreOrders">Mostrar ${Math.min(50, orders.length - ordersLimit)} pedidos más</button>` : ''}`;
     },
     estadisticas() {
       const cutoff = statsPeriod === 'all' ? 0 : Date.now() - Number(statsPeriod) * 86400000;
@@ -304,21 +407,38 @@
     delAnn(el) { data.announcements.splice(el.dataset.i, 1); markDirty(); render(); },
     async refreshOrders() { orders = (await api('orders')).orders || []; ordersLimit = 50; render(); toast('Pedidos actualizados.'); },
     loadMoreOrders() { ordersLimit += 50; render(); },
-    manageOrder(el) { openOrderId = openOrderId === el.dataset.orderId ? null : el.dataset.orderId; render(); },
-    async confirmOrder(el) {
-      const order = orders.find(o => String(o.id) === el.dataset.orderId); if (!order) throw new Error('No se encontró esa comanda.');
-      const printWindow = window.open('', '_blank', 'width=380,height=760');
-      const field = document.querySelector(`[data-order-fee=\"${order.id}\"]`);
-      const fee = order.mode === 'pickup' ? 0 : Number(field?.value);
-      if (order.mode !== 'pickup' && (!Number.isFinite(fee) || fee < 0 || fee > 999 || field?.value === '')) { printWindow?.close(); throw new Error('Indica un costo de delivery válido para confirmar esta comanda.'); }
-      try {
-        const result = await api(`orders/${encodeURIComponent(order.id)}`, { method: 'PUT', body: JSON.stringify({ deliveryFeeUSD: fee }) });
-        orders = orders.map(o => String(o.id) === order.id ? result.order : o); openOrderId = null; render();
-        if (printWindow) writeReceipt(printWindow, result.order); else toast('Comanda confirmada. El navegador bloqueó la ventana de impresión; usa Imprimir otra vez.', true);
-        toast('Comanda confirmada y total guardado.');
-      } catch (error) { printWindow?.close(); throw error; }
+    feeStep(el) {
+      const input = document.querySelector(`[data-order-fee="${el.dataset.orderId}"]`); if (!input) return;
+      input.value = Math.min(999, Math.max(0, round2((parseFee(input.value) ?? 0) + Number(el.dataset.step)))).toFixed(2);
+      syncFee(input); input.focus();
     },
-    printOrder(el) { const order = orders.find(o => String(o.id) === el.dataset.orderId); if (!order) throw new Error('No se encontró esa comanda.'); printReceipt(order); },
+    previewOrder(el) {
+      const order = orders.find(o => String(o.id) === el.dataset.orderId); if (!order) throw new Error('No se encontró esa comanda.');
+      let fee = Number(order.deliveryFeeUSD) || 0;
+      if (order.status !== 'confirmed' && order.mode !== 'pickup') {
+        const input = document.querySelector(`[data-order-fee="${order.id}"]`);
+        fee = parseFee(input ? input.value : feeValue(order));
+        if (fee === null) { input?.focus(); throw new Error('Escribe un costo de delivery válido (entre 0 y 999; usa 0 si no se cobra).'); }
+      }
+      return openPreview(order, fee);
+    },
+    closePreview() { closePreview(); },
+    async confirmAndPrint() {
+      if (!preview || preview.saving) return;
+      const order = orders.find(o => String(o.id) === preview.id); if (!order) throw new Error('No se encontró esa comanda.');
+      preview.saving = true; paintFoot();
+      try {
+        const result = await api(`orders/${encodeURIComponent(order.id)}`, { method: 'PUT', body: JSON.stringify({ deliveryFeeUSD: preview.fee }) });
+        orders = orders.map(o => String(o.id) === String(order.id) ? result.order : o); delete feeDrafts[order.id];
+        preview.saving = false; preview.printed = true;
+        render(); paintNote(result.order, result.order); paintFoot();
+        const html = receiptHtml(result.order);
+        if (html !== currentReceiptHtml) await loadFrame(html); // solo si el servidor cambió algo
+        printFrame();
+        $('#modalFoot .btn--red')?.focus(); // imprimir deja el foco dentro de la comanda: se devuelve al botón
+      } catch (error) { if (preview) { preview.saving = false; paintFoot(); } throw error; }
+    },
+    printPreview() { if (!preview) return; if (printFrame()) { preview.printed = true; paintFoot(); $('#modalFoot .btn--red')?.focus(); } },
     async refreshCustomers() { customers = (await api('customers')).customers || []; render(); toast('Clientes actualizados.'); },
     selectAllCustomers() { customers.filter(c => c.marketingConsent && c.marketingChannel !== 'email' && (!customerQuery.trim() || `${c.name} ${c.phone} ${c.email || ''}`.toLowerCase().includes(customerQuery.trim().toLowerCase()))).forEach(c => selectedCustomerIds.add(String(c.id))); campaignLinksReady = false; render(); },
     clearCustomerSelection() { selectedCustomerIds.clear(); campaignLinksReady = false; render(); },
@@ -347,6 +467,7 @@
     try { await ACTIONS[el.dataset.act]?.(el); } catch (error) { if (error.status === 401) showLogin('Tu sesión venció. Entra de nuevo.'); else toast(error.message, true); }
   });
   document.addEventListener('input', event => {
+    if (event.target.matches('[data-order-fee]')) { syncFee(event.target); return; }
     if (event.target.id === 'q') { query = event.target.value; $('#plist').innerHTML = productList(); return; }
     if (event.target.id === 'customerSearch') { customerQuery = event.target.value; const pos = event.target.selectionStart; render(); const input = $('#customerSearch'); input.focus(); input.setSelectionRange(pos, pos); return; }
     if (event.target.id === 'campaignText') { campaignText = event.target.value; campaignLinksReady = false; return; }
@@ -370,6 +491,18 @@
     const after = event.target.closest('[data-after="rerender"]'); if (after) render();
   });
   window.addEventListener('beforeunload', event => { if (dirty) { event.preventDefault(); event.returnValue = ''; } });
+  // Vista previa: Esc la cierra, tocar el fondo oscuro también, y Tab no se escapa hacia la página de atrás.
+  document.addEventListener('click', event => { if (preview && event.target.id === 'receiptModal') closePreview(); });
+  document.addEventListener('keydown', event => {
+    if (!preview) return;
+    if (event.key === 'Escape') { event.preventDefault(); closePreview(); return; }
+    if (event.key !== 'Tab') return;
+    const nodes = [...$('#receiptModal').querySelectorAll('button:not([disabled]),a[href],input,select,textarea')].filter(n => n.offsetParent !== null);
+    if (!nodes.length) return;
+    const first = nodes[0], last = nodes[nodes.length - 1];
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+  });
 
   async function save() {
     const button = $('#saveBtn'); button.disabled = true; button.textContent = 'Guardando...';
@@ -390,6 +523,7 @@
 
   /* ---------- Inicio y sesión ---------- */
   function showLogin(message = '') {
+    closePreview();
     $('#app').hidden = true; $('#login').hidden = false;
     const node = $('#loginMsg'); node.hidden = !message; node.textContent = message;
   }

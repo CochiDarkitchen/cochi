@@ -64,7 +64,7 @@ main{padding:12px 16px 20px;max-width:760px;margin:0 auto;display:grid;gap:14px}
 /* Barra de guardado */
 .savebar{position:fixed;left:0;right:0;bottom:0;z-index:30;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px calc(12px + env(safe-area-inset-bottom));background:var(--ink);color:var(--paper);box-shadow:0 -12px 30px -16px rgba(0,0,0,.5)}
 .savebar span{font-size:13px;font-weight:700}.savebar.is-dirty span{color:#ffd27a}.savebar .btn{min-width:170px}
-.toast{position:fixed;left:50%;bottom:calc(90px + env(safe-area-inset-bottom));z-index:40;max-width:min(92vw,440px);padding:13px 20px;border-radius:16px;background:var(--ink);color:#fff;font-size:14px;font-weight:700;text-align:center;opacity:0;pointer-events:none;transform:translate(-50%,16px) scale(.96);transition:opacity .3s,transform .35s cubic-bezier(.2,1.5,.4,1)}
+.toast{position:fixed;left:50%;bottom:calc(90px + env(safe-area-inset-bottom));z-index:60;max-width:min(92vw,440px);padding:13px 20px;border-radius:16px;background:var(--ink);color:#fff;font-size:14px;font-weight:700;text-align:center;opacity:0;pointer-events:none;transform:translate(-50%,16px) scale(.96);transition:opacity .3s,transform .35s cubic-bezier(.2,1.5,.4,1)}
 .toast.is-on{opacity:1;transform:translate(-50%,0) scale(1)}.toast.is-bad{background:#b30e08}
 @media (min-width:700px){.row3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}}
 @media (max-width:420px){.prow__main{grid-template-columns:48px 1fr 96px}.thumb{width:48px;height:48px}.row2{grid-template-columns:1fr}.item--flyer{grid-template-columns:1fr}.item--flyer .thumb{width:100%;height:auto;aspect-ratio:4/5}}
@@ -88,3 +88,32 @@ main{padding:12px 16px 20px;max-width:760px;margin:0 auto;display:grid;gap:14px}
 .customer-head h3{min-width:0}.customer-check{display:inline-flex;align-items:center;gap:7px;flex:none;font-size:12px;font-weight:800}.customer-check input{width:19px;height:19px;min-height:0;accent-color:var(--red)}.campaign-results{display:grid;gap:9px}.campaign-link{display:flex;align-items:center;gap:9px;flex-wrap:wrap;padding:10px 12px;border:1px solid var(--line);border-radius:14px;background:#fff;font-size:12px}.campaign-link strong{margin-right:auto}.campaign-link span{color:var(--soft)}
 @media(min-width:700px){.metric-grid{grid-template-columns:repeat(4,minmax(0,1fr))}.order-card{padding:20px}.bar-row{max-width:100%}}
 @media(max-width:440px){.section-head{align-items:stretch;flex-direction:column}.period-field{width:100%}.order-head{align-items:flex-start}.campaign-link{align-items:flex-start}.campaign-link .btn{width:100%}}
+
+/* Delivery de cada comanda pendiente */
+.fee-box{display:grid;gap:12px;padding:14px;border:2px solid var(--ink);border-radius:18px;background:#fff}
+.fee-box__head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}.fee-box__head h4{margin:0;font-size:15px;letter-spacing:-.02em}.fee-box__head small{color:var(--soft);font-weight:600;font-size:12px}
+.fee-row{display:grid;grid-template-columns:52px minmax(0,1fr) 52px;gap:8px;align-items:center}
+.fee-step{min-height:52px;padding:0;font-size:24px;line-height:1}
+.fee-input{position:relative;display:block}.fee-input b{position:absolute;left:16px;top:50%;transform:translateY(-50%);font-size:20px;color:var(--soft);pointer-events:none}
+.fee-input input{min-height:52px;padding:6px 14px 6px 36px;border-radius:16px;font-size:22px;font-weight:800;text-align:center;-moz-appearance:textfield;appearance:textfield}
+.fee-input input::-webkit-outer-spin-button,.fee-input input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.fee-input input[aria-invalid=true]{border-color:#b30e08;background:#fff6f5}
+.fee-summary{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:5px 10px;padding:12px;border-radius:14px;background:var(--paper);font-size:13px;font-weight:700}.fee-summary strong{text-align:right}
+.fee-summary .fee-total{font-size:17px;font-weight:900;padding-top:6px;border-top:1px dashed var(--line)}.fee-summary .muted{font-weight:600;font-size:12px}
+.fee-hint{margin:0;color:#8c0b06;font-size:12.5px;font-weight:700}
+
+/* Vista previa de la comanda */
+body.modal-open{overflow:hidden}
+.modal{position:fixed;inset:0;z-index:50;display:grid;place-items:center;padding:16px;background:rgba(33,30,26,.66)}
+.modal__box{width:min(100%,520px);max-height:calc(100dvh - 32px);display:grid;grid-template-rows:auto minmax(0,1fr) auto;overflow:hidden;background:var(--paper-light);border-radius:24px;box-shadow:0 30px 70px -20px rgba(0,0,0,.6);animation:pop .35s cubic-bezier(.2,1.3,.4,1) both}
+.modal__head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;border-bottom:1px solid var(--line)}.modal__head h2{font-size:17px}
+.modal__body{display:grid;gap:12px;align-content:start;overflow:auto;padding:14px 16px;background:var(--cream)}
+.modal__note{margin:0;display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;font-size:13px;font-weight:600}
+.modal__hint{margin:0;text-align:center}
+.modal__foot{display:flex;gap:10px;padding:12px 16px calc(12px + env(safe-area-inset-bottom));border-top:1px solid var(--line);background:var(--paper-light)}.modal__foot .btn{flex:1;padding:0 12px;white-space:nowrap}.modal__foot .btn--red{flex:1.4}
+.paper-stage{display:flex;justify-content:center;padding:6px 0 18px}
+.paper-wrap{--zoom:1.5;position:relative;flex:none;width:calc(58mm * var(--zoom))}
+.paper{position:absolute;top:0;left:0;width:58mm;transform:scale(var(--zoom));transform-origin:top left;background:#fff;box-shadow:0 10px 26px -12px rgba(0,0,0,.55)}
+.paper iframe{display:block;width:58mm;border:0;background:#fff}
+.paper::after{content:"";position:absolute;left:0;right:0;top:100%;height:6px;background:#fff;-webkit-mask:conic-gradient(from -45deg at bottom,#0000,#000 1deg 90deg,#0000 91deg) 50%/12px 100%;mask:conic-gradient(from -45deg at bottom,#0000,#000 1deg 90deg,#0000 91deg) 50%/12px 100%;filter:drop-shadow(0 2px 2px rgba(0,0,0,.18))}
+@media(max-width:560px){.modal{padding:0;place-items:stretch}.modal__box{width:100%;max-height:none;height:100dvh;border-radius:0}.paper-wrap{--zoom:1.25}}

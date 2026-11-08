@@ -131,6 +131,26 @@ async function waitForServer(url, child) {
     assert.equal(revoke.status, 200, 'El panel debe permitir retirar la autorización de promociones.');
     assert.ok(adminJs.includes("['comandas', 'Comandas']") && adminJs.includes("['estadisticas', 'Estadísticas']") && adminJs.includes('prepareCampaign'), 'El panel debe incluir comandas, estadísticas y campañas.');
     assert.ok(adminJs.includes('@page{size:58mm auto') && adminJs.includes('Imprimir otra vez') && adminCss.includes('.bar-track'), 'La comanda térmica y las barras estadísticas deben estar preparadas.');
+    const adminHtml = fs.readFileSync(path.join(publicDir, 'admin/index.html'), 'utf8');
+    assert.ok(adminJs.includes('data-order-fee') && adminJs.includes('feeSummaryHtml') && adminJs.includes('Vista previa de la comanda'), 'Cada comanda pendiente debe mostrar el campo de delivery con su total.');
+    assert.ok(adminJs.includes('confirmAndPrint') && adminJs.includes('printFrame') && !adminJs.includes('manageOrder'), 'Se imprime desde la vista previa, después de confirmar.');
+    for (const id of ['receiptModal', 'receiptFrame', 'paperWrap', 'modalNote', 'modalFoot', 'modalTitle']) assert.ok(adminHtml.includes(`id="${id}"`), `Falta #${id} en la vista previa de impresión.`);
+    // Delivery: obligatorio (0 si es gratis) y limitado a 0–999; en retiro siempre es $0 aunque llegue un monto.
+    const plainOrder = { ...orderTest, marketingConsent: false, couponCode: '', discount: 0, productsTotal: 16, total: 16 };
+    const sendOrder = body => fetch(`${base}/api/orders`, { method: 'POST', headers: json, body: JSON.stringify(body) });
+    const confirmWith = (id, body) => fetch(`${base}/api/admin/orders/${id}`, { method: 'PUT', headers: auth, body: JSON.stringify(body) });
+    assert.equal((await sendOrder({ ...plainOrder, orderId: 'CH-1107-9877', mode: 'pickup' })).status, 200);
+    assert.equal((await sendOrder({ ...plainOrder, orderId: 'CH-1107-9878', mode: 'delivery' })).status, 200);
+    const pickupDone = await (await confirmWith('CH-1107-9877', { deliveryFeeUSD: 9 })).json();
+    assert.equal(pickupDone.order.deliveryFeeUSD, 0, 'En retiro nunca se cobra delivery, aunque llegue un monto.');
+    assert.equal(pickupDone.order.finalTotalUSD, 16);
+    const missingFee = await confirmWith('CH-1107-9878', {});
+    assert.equal(missingFee.status, 400, 'En delivery el monto es obligatorio.');
+    assert.match((await missingFee.json()).error, /costo de delivery/, 'El aviso debe explicar qué falta.');
+    assert.equal((await confirmWith('CH-1107-9878', { deliveryFeeUSD: 1000 })).status, 400, 'Un delivery mayor a 999 se rechaza.');
+    assert.equal((await confirmWith('CH-1107-9878', { deliveryFeeUSD: -1 })).status, 400, 'Un delivery negativo se rechaza.');
+    assert.equal((await (await confirmWith('CH-1107-9878', { deliveryFeeUSD: 0 })).json()).order.finalTotalUSD, 16, 'Delivery gratis ($0) es válido.');
+    assert.equal((await (await confirmWith('CH-1107-9878', { deliveryFeeUSD: '2.346' })).json()).order.finalTotalUSD, 18.35, 'El monto se redondea a centavos igual que en la vista previa.');
     ok('Pedidos: historial completo, datos de opciones, confirmación del delivery, total final y revocación de consentimiento validados.');
     const apiFiles = listApiJavaScriptFiles(path.join(root, 'api'));
     assert.deepEqual(apiFiles.map(file => path.relative(root, file).split(path.sep).join('/')), ['api/handler.js'], 'En el plan Hobby debe existir una sola función API.');
