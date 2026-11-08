@@ -14,7 +14,7 @@ Esta versión está pensada para que el cliente vea el menú, elija sus producto
 
 ## Panel de administración
 
-Desde `tu-sitio.com/admin/` entras con tu correo y contraseña y puedes cambiar, sin tocar código:
+Desde `tu-sitio.com/admin/` (también funciona `tu-sitio.com/admin`) entras con tu correo y contraseña y puedes cambiar, sin tocar código:
 
 - **Tasa y datos:** tasa BCV y su fecha, número de WhatsApp y costo de delivery.
 - **Productos:** precio, foto, nombre, descripción, categoría, visible/disponible, destacado y "próximamente". También puedes agregar y eliminar productos.
@@ -85,6 +85,10 @@ Se revisó el sitio con una auditoría automática y con pruebas de teclado. Lo 
 - Errores del formulario enlazados al campo, categorías con estado "pulsado" y flyers con enlaces que dicen a qué flyer pertenecen.
 
 Pendiente recomendado: probar el sitio con un lector de pantalla real (VoiceOver en iPhone y TalkBack en Android), porque la auditoría automática no sustituye esa prueba. Al subir fotos nuevas desde el panel, el texto alternativo se genera con el nombre del producto o el título del flyer: usa nombres claros.
+
+## Si al abrir `/admin` aparece `404 NOT_FOUND`
+
+La ruta `/admin` se envía directamente a `public/admin/index.html` mediante una regla de rewrite en `vercel.json`. También puedes abrir `tu-sitio.com/admin/` con la barra final. Después de subir un cambio en `vercel.json`, espera a que Vercel termine el nuevo despliegue.
 
 ## Si el panel muestra `404 NOT_FOUND` en Clientes, Comandas o Estadísticas
 

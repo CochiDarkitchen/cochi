@@ -1,0 +1,55 @@
+{
+  "announcements": [
+    "EL ANTOJO TIENE NOMBRE",
+    "TRABAJAMOS DE VIERNES A DOMINGO",
+    "ARMA TU PEDIDO",
+    "COCHI, SIN COMPLICACIONES"
+  ],
+  "upsells": [
+    {
+      "id": "shawarma-papas",
+      "title": "Agrégale papas fritas",
+      "text": "Ración pequeña con tu shawarma.",
+      "when_categories": [
+        "Shawarmas"
+      ],
+      "add_slug": "papas-pequenas",
+      "price_usd": 1,
+      "max_per_item": 1,
+      "active": true
+    }
+  ],
+  "flyers": [
+    {
+      "id": "papas-shawarma",
+      "title": "Agrégale papas a tu shawarma",
+      "text": "Por solo $1 en lugar de $1.50. Elige tu shawarma y marca la opción de papas.",
+      "image": "/assets/flyers/papas-shawarma.webp",
+      "badge": "OFERTA",
+      "link": "#menu",
+      "linkLabel": "Ver el menú",
+      "active": true
+    },
+    {
+      "id": "contornos",
+      "title": "Más contornos, más Cochi",
+      "text": "Elige entre papas, yuca o ensalada por +$2 y agrega otra ración. Pollo asado solo los domingos o por encargo.",
+      "image": "/assets/flyers/contornos.webp",
+      "badge": "DOMINGOS",
+      "link": "#menu",
+      "linkLabel": "Pedir ahora",
+      "active": true
+    },
+    {
+      "id": "ya-probaste",
+      "title": "¿Ya probaste Cochi?",
+      "text": "Shawarmas, costillas y más. Arma tu pedido desde el menú.",
+      "image": "/assets/flyers/ya-probaste.webp",
+      "badge": "",
+      "link": "#favoritos",
+      "linkLabel": "Ver favoritos",
+      "active": true
+    }
+  ],
+  "testimonials": []
+}

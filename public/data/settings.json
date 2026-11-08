@@ -1,0 +1,56 @@
+{
+  "whatsappNumber": "584242246392",
+  "orderModes": [
+    "delivery",
+    "pickup"
+  ],
+  "deliveryFeeUSD": null,
+  "usdToVes": 887.302,
+  "exchangeRateDate": "2026-10-27",
+  "exchangeRateName": "Tasa BCV actualizada por Cochi",
+  "ordersPaused": false,
+  "schedule": [
+    {
+      "day": 0,
+      "open": true,
+      "from": "00:00",
+      "to": "23:59"
+    },
+    {
+      "day": 1,
+      "open": false,
+      "from": "00:00",
+      "to": "23:59"
+    },
+    {
+      "day": 2,
+      "open": false,
+      "from": "00:00",
+      "to": "23:59"
+    },
+    {
+      "day": 3,
+      "open": false,
+      "from": "00:00",
+      "to": "23:59"
+    },
+    {
+      "day": 4,
+      "open": false,
+      "from": "00:00",
+      "to": "23:59"
+    },
+    {
+      "day": 5,
+      "open": true,
+      "from": "00:00",
+      "to": "23:59"
+    },
+    {
+      "day": 6,
+      "open": true,
+      "from": "00:00",
+      "to": "23:59"
+    }
+  ]
+}

@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#eb140c">
+  <title>Panel Cochi</title>
+  <link rel="icon" href="/assets/brand/favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/admin/admin.css">
+</head>
+<body>
+  <section class="login" id="login">
+    <form class="login__card" id="loginForm" autocomplete="on">
+      <img src="/assets/brand/cochi-isotipo-red.png" alt="" width="74" height="77">
+      <h1>Panel Cochi</h1>
+      <p class="muted">Entra para cambiar precios, tasa, imágenes y flyers.</p>
+      <label>Correo<input type="email" id="loginEmail" name="email" autocomplete="username" required></label>
+      <label>Contraseña<input type="password" id="loginPass" name="password" autocomplete="current-password" required></label>
+      <p class="msg" id="loginMsg" role="alert" hidden></p>
+      <button type="submit" class="btn btn--red" id="loginBtn">Entrar</button>
+      <a class="muted" href="/">Volver al sitio</a>
+    </form>
+  </section>
+
+  <div id="app" hidden>
+    <header class="top">
+      <img src="/assets/brand/cochi-logo-red.png" alt="Cochi" width="92" height="36">
+      <span class="top__tag">PANEL</span>
+      <a class="btn btn--ghost" href="/" target="_blank" rel="noopener">Ver sitio</a>
+      <button class="btn btn--ghost" type="button" data-act="logout">Salir</button>
+    </header>
+    <nav class="tabs" id="tabs" aria-label="Secciones del panel"></nav>
+    <p class="banner" id="banner" hidden></p>
+    <main id="panel"></main>
+    <div class="savebar" id="savebar">
+      <span id="saveState">Sin cambios</span>
+      <button class="btn btn--red" type="button" id="saveBtn" data-act="save" disabled>Guardar cambios</button>
+    </div>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="/admin/admin.js"></script>
+</body>
+</html>
