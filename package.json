@@ -1,6 +1,6 @@
 {
   "name": "cochi-experiencia-gastronomica",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "private": true,
   "description": "Carta digital para Cochi con pedidos por WhatsApp, panel administrativo, clientes, estadísticas y comandas térmicas; rutas API explícitas para Vercel.",
   "scripts": {
@@ -11,6 +11,6 @@
     "build": "node scripts/set-site-url.js"
   },
   "engines": {
-    "node": ">=18"
+    "node": "24.x"
   }
 }
