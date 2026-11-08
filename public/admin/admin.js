@@ -419,6 +419,6 @@
       const session = await api('session');
       if (!session.configured) return showLogin('El panel aún no está configurado: faltan ADMIN_EMAIL, ADMIN_PASSWORD y SESSION_SECRET (mira el README).');
       if (session.authenticated) await loadData(); else showLogin();
-    } catch { showLogin('No se pudo conectar con el servidor.'); }
+    } catch (error) { showLogin(error?.status ? error.message : 'No se pudo conectar con el servidor.'); }
   })();
 })();

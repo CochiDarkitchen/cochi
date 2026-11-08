@@ -94,7 +94,7 @@
     },
     {
       "source": "/api/:path*",
-      "destination": "/api/_handler?__cochi_path=:path*"
+      "destination": "/api/handler?__cochi_path=:path*"
     }
   ]
 }

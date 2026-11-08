@@ -35,9 +35,9 @@ Todo se guarda con el botón **Guardar cambios**. El panel muestra el error conc
 
 ### Si Vercel dice que superaste las 12 funciones del plan Hobby
 
-Este proyecto queda preparado para crear **una sola función de servidor**: `api/_handler.js`. El archivo `vercel.json` envía las direcciones `/api/...` a esa función y conserva la ruta original para que el panel, los pedidos, los clientes, los cupones y las imágenes sigan funcionando. No hace falta cambiar al plan Pro por este motivo.
+Este proyecto queda preparado para crear **una sola función de servidor**: `api/handler.js`. El archivo `vercel.json` envía las direcciones `/api/...` a esa función y conserva la ruta original para que el panel, los pedidos, los clientes, los cupones y las imágenes sigan funcionando. No hace falta cambiar al plan Pro por este motivo.
 
-**Importante:** no crees más archivos `.js` dentro de `api/`. Para agregar o modificar un endpoint, trabaja dentro de `lib/api.js` y mantén la única función `api/_handler.js`. Sube la carpeta completa del proyecto actualizado al repositorio y deja que Vercel genere un despliegue nuevo.
+**Importante:** no crees más archivos `.js` dentro de `api/`. Para agregar o modificar un endpoint, trabaja dentro de `lib/api.js` y mantén la única función `api/handler.js`. **Nunca empieces el nombre de ese archivo con `_` o `.`** (por ejemplo `_handler.js`): Vercel ignora esos archivos dentro de `api/`, no crea la función y todo `/api/*` responde `404 NOT_FOUND`. Sube la carpeta completa del proyecto actualizado al repositorio y deja que Vercel genere un despliegue nuevo.
 
 ### Ponerlo en Vercel (paso 3)
 Vercel no permite guardar archivos en el servidor, por eso el panel usa una base de datos gratuita de Upstash:
@@ -90,9 +90,13 @@ Pendiente recomendado: probar el sitio con un lector de pantalla real (VoiceOver
 
 La ruta `/admin` se envía directamente a `public/admin/index.html` mediante una regla de rewrite en `vercel.json`. También puedes abrir `tu-sitio.com/admin/` con la barra final. Después de subir un cambio en `vercel.json`, espera a que Vercel termine el nuevo despliegue.
 
+## Si el login del panel dice "El servidor respondió 404 … NOT_FOUND"
+
+Es el 404 de Vercel (no de la app): la función `api/handler.js` no se creó. Comprueba que ese archivo exista, que su nombre **no empiece con `_` ni `.`** y que `vercel.json` lo use en el rewrite de `/api/:path*`. Luego abre `tu-sitio.com/api/health`: si responde `{"ok":true,...}`, la función ya está viva. Si sigue en 404, en Vercel entra a **Deployments > el último > Functions** y confirma que aparezca `api/handler`.
+
 ## Si el panel muestra `404 NOT_FOUND` en Clientes, Comandas o Estadísticas
 
-Ese error significa que Vercel no encontró una ruta API; no demuestra por sí solo que se hayan perdido los datos ni que Upstash esté desconectado. Esta versión usa una sola función (`api/_handler.js`) y una regla de rewrite para atender todos los endpoints bajo `/api/`. Así se evita crear una función independiente por archivo y se mantiene el proyecto dentro del límite del plan Hobby. La lógica de todas las rutas sigue centralizada en `lib/api.js`; clientes, comandas, sesiones, contenido, cupones, imágenes y pedidos conservan sus mismas direcciones. Después de subirla, Vercel debe crear un nuevo despliegue desde el repositorio.
+Ese error significa que Vercel no encontró una ruta API; no demuestra por sí solo que se hayan perdido los datos ni que Upstash esté desconectado. Esta versión usa una sola función (`api/handler.js`) y una regla de rewrite para atender todos los endpoints bajo `/api/`. Así se evita crear una función independiente por archivo y se mantiene el proyecto dentro del límite del plan Hobby. La lógica de todas las rutas sigue centralizada en `lib/api.js`; clientes, comandas, sesiones, contenido, cupones, imágenes y pedidos conservan sus mismas direcciones. Después de subirla, Vercel debe crear un nuevo despliegue desde el repositorio.
 
 Si el panel deja de mostrar el `404` pero aparece un mensaje indicando que la base de datos no está conectada, entra en **Storage** y confirma que Upstash Redis esté conectado al proyecto. En **Settings > Environment Variables** deben existir `KV_REST_API_URL` y `KV_REST_API_TOKEN` (o sus equivalentes `UPSTASH_REDIS_REST_URL` y `UPSTASH_REDIS_REST_TOKEN`). Después haz **Redeploy**. No pegues esos valores en mensajes ni en GitHub. La versión corregida muestra un `503` claro en vez de mostrar falsamente cero clientes o pedidos cuando no hay almacenamiento conectado.
 
@@ -196,7 +200,7 @@ cochi-proyecto/
 │   │   ├── settings.json   # WhatsApp y tasa manual
 │   │   └── products.json   # Menú, descripciones y precios
 │   └── assets/             # Logos, isotipos e imágenes
-├── api/_handler.js        # Única función API; vercel.json desvía aquí todos los /api/*
+├── api/handler.js        # Única función API; vercel.json desvía aquí todos los /api/*
 ├── lib/api.js              # Lógica única: sesión, validación y almacenamiento
 └── scripts/dev-server.js   # Servidor SOLO para probar en tu computadora
 └── vercel.json             # Reglas de publicación

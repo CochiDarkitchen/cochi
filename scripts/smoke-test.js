@@ -15,7 +15,7 @@ const app = fs.readFileSync(path.join(publicDir, 'app.js'), 'utf8');
 const adminJs = fs.readFileSync(path.join(publicDir, 'admin/admin.js'), 'utf8');
 const adminCss = fs.readFileSync(path.join(publicDir, 'admin/admin.css'), 'utf8');
 const css = fs.readFileSync(path.join(publicDir, 'styles.css'), 'utf8');
-const singleApiRoute = path.join(root, 'api', '_handler.js');
+const singleApiRoute = path.join(root, 'api', 'handler.js');
 function listApiJavaScriptFiles(directory) {
   return fs.readdirSync(directory, { withFileTypes: true }).flatMap(entry => {
     const fullPath = path.join(directory, entry.name);
@@ -133,21 +133,24 @@ async function waitForServer(url, child) {
     assert.ok(adminJs.includes('@page{size:58mm auto') && adminJs.includes('Imprimir otra vez') && adminCss.includes('.bar-track'), 'La comanda térmica y las barras estadísticas deben estar preparadas.');
     ok('Pedidos: historial completo, datos de opciones, confirmación del delivery, total final y revocación de consentimiento validados.');
     const apiFiles = listApiJavaScriptFiles(path.join(root, 'api'));
-    assert.deepEqual(apiFiles.map(file => path.relative(root, file).split(path.sep).join('/')), ['api/_handler.js'], 'En el plan Hobby debe existir una sola función API.');
+    assert.deepEqual(apiFiles.map(file => path.relative(root, file).split(path.sep).join('/')), ['api/handler.js'], 'En el plan Hobby debe existir una sola función API.');
+    // Vercel NO convierte en función los archivos o carpetas de api/ cuyo nombre empieza con "_" o ".".
+    // Si la única función se llamara así, /api/* respondería 404 NOT_FOUND en producción.
+    assert.ok(apiFiles.every(file => path.relative(path.join(root, 'api'), file).split(path.sep).every(part => !/^[_.]/.test(part))), 'El archivo de la función en api/ no puede empezar con "_" ni "." (Vercel lo ignoraría y /api/* daría 404).');
     const vercelEntry = require(singleApiRoute);
     assert.equal(typeof vercelEntry, 'function', 'La única función API de Vercel debe exportar un manejador válido.');
     const simulatedVercel = require('node:http').createServer((req, res) => vercelEntry(req, res));
     await new Promise(resolve => simulatedVercel.listen(4185, '127.0.0.1', resolve));
     try {
-      const routedHealth = await fetch('http://127.0.0.1:4185/api/_handler?__cochi_path=health');
+      const routedHealth = await fetch('http://127.0.0.1:4185/api/handler?__cochi_path=health');
       assert.equal(routedHealth.status, 200, 'La ruta reescrita /api/health debe llegar a la función única.');
       assert.equal((await routedHealth.json()).ok, true);
-      const routedSession = await fetch('http://127.0.0.1:4185/api/_handler?__cochi_path=admin%2Fsession');
+      const routedSession = await fetch('http://127.0.0.1:4185/api/handler?__cochi_path=admin%2Fsession');
       assert.equal(routedSession.status, 200, 'Las rutas API de varios niveles deben llegar a la función única.');
       assert.equal((await routedSession.json()).authenticated, false);
     } finally { await new Promise(resolve => simulatedVercel.close(resolve)); }
     const vercelConfig = JSON.parse(fs.readFileSync(path.join(root, 'vercel.json'), 'utf8'));
-    assert.ok(vercelConfig.rewrites.some(rule => rule.source === '/api/:path*' && rule.destination === '/api/_handler?__cochi_path=:path*'), 'Vercel debe redirigir todos los endpoints al manejador único.');
+    assert.ok(vercelConfig.rewrites.some(rule => rule.source === '/api/:path*' && rule.destination === '/api/handler?__cochi_path=:path*'), 'Vercel debe redirigir todos los endpoints al manejador único.');
     ok('Enrutamiento Vercel: una sola función y rewrite probado para rutas simples y anidadas de la API.');
     const couponRead = await fetch(`${base}/api/admin/coupons`, { headers: auth });
     assert.equal(couponRead.status, 200, 'El panel debe poder leer los cupones.');
