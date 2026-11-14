@@ -67,6 +67,8 @@ Los registros se guardan en el mismo almacenamiento Upstash conectado al proyect
 
 En el panel privado (`/admin`) abre la pestaña **Temas**. Allí puedes activar **Cochi original**, **Black Friday**, **Navidad**, **Año Nuevo** o **San Valentín**. La selección cambia la paleta de la página (fondos, textos, botones, acentos y secciones) y se publica cuando pulses **Guardar cambios**. Para volver al diseño habitual, selecciona **Cochi original**.
 
+Debajo de las temáticas puedes personalizar individualmente la paleta de la temática seleccionada: colores principales, fondos, textos, Cochi Dulce y detalles (franja superior, línea decorativa del encabezado y degradados). Cada tema guarda sus propios códigos HEX. Puedes escribirlos en formato `#RRGGBB` o usar el selector visual, y restaurar la paleta original de ese tema cuando lo necesites. Recuerda pulsar **Guardar cambios** para publicar.
+
 En esa misma pestaña puedes cargar tres recursos independientes: logo del encabezado, logo para el pie de página (fondo oscuro) e isotipo del cerdito. Se optimizan y guardan en el almacenamiento que ya utiliza el proyecto; si no cargas una versión temática, el sitio conserva el recurso original de Cochi. Recomendado: PNG o WebP con transparencia.
 
 Los temas no cambian productos, precios, disponibilidad ni datos de pedidos. Solo cambian la presentación visual y los recursos de marca que hayas subido.

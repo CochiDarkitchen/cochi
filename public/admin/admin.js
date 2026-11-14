@@ -4,11 +4,22 @@
   const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const TABS = [['temas', 'Temas'], ['tasa', 'Tasa y datos'], ['horario', 'Horario'], ['productos', 'Productos'], ['flyers', 'Flyers'], ['comentarios', 'Comentarios'], ['ofertas', 'Ofertas y avisos'], ['cupones', 'Cupones'], ['comandas', 'Comandas'], ['estadisticas', 'Estadísticas'], ['clientes', 'Clientes']];
   const THEME_PRESETS = [
-    { id: 'original', name: 'Cochi original', note: 'Rojo intenso y crema', colors: ['#eb140c', '#e6e0bf', '#211e1a'] },
-    { id: 'black-friday', name: 'Black Friday', note: 'Negro, dorado y alto contraste', colors: ['#151515', '#e4b64e', '#f8f2e7'] },
-    { id: 'navidad', name: 'Navidad', note: 'Rojo festivo, verde y dorado', colors: ['#b52331', '#24563b', '#dbb75c'] },
-    { id: 'ano-nuevo', name: 'Año Nuevo', note: 'Azul noche y champagne', colors: ['#11192c', '#d7b76a', '#f8f3e8'] },
-    { id: 'san-valentin', name: 'San Valentín', note: 'Rosa suave y borgoña', colors: ['#ae3456', '#efd4db', '#4b2330'] }
+    { id: 'original', name: 'Cochi original', note: 'Rojo intenso y crema', colors: ['#eb140c', '#e6e0bf', '#211e1a'], palette: { primary:'#eb140c',primaryDark:'#c90f09',cream:'#e6e0bf',background:'#f5f0dc',surface:'#fbf7e9',text:'#211e1a',mutedText:'#60594e',border:'#211e1a',dulcePink:'#f1d6df',dulcePinkLight:'#faeaf0',dulceChocolate:'#4b2928',green:'#1f6644',white:'#fffdf7',redInk:'#bd0d07',announcementBg:'#eb140c',announcementText:'#fffdf7',announcementDot:'#e6e0bf',headerStripeStart:'#eb140c',headerStripeEnd:'#eb140c',featureGradientStart:'#b80f09',featureGradientEnd:'#ed261c' } },
+    { id: 'black-friday', name: 'Black Friday', note: 'Negro, dorado y alto contraste', colors: ['#151515', '#e4b64e', '#f8f2e7'], palette: { primary:'#e0b34d',primaryDark:'#ba8c29',cream:'#e9c875',background:'#151515',surface:'#22211f',text:'#f8f2e7',mutedText:'#c9c1b1',border:'#f8f2e7',dulcePink:'#302b26',dulcePinkLight:'#f5ead6',dulceChocolate:'#e0b34d',green:'#80a98a',white:'#fffaf0',redInk:'#e9c875',announcementBg:'#080808',announcementText:'#f1cc72',announcementDot:'#f1cc72',headerStripeStart:'#e0b34d',headerStripeEnd:'#ba8c29',featureGradientStart:'#77551b',featureGradientEnd:'#d0a33e' } },
+    { id: 'navidad', name: 'Navidad', note: 'Rojo festivo, verde y dorado', colors: ['#b52331', '#24563b', '#dbb75c'], palette: { primary:'#b52331',primaryDark:'#8f1925',cream:'#dbb75c',background:'#f2ecda',surface:'#fff9eb',text:'#203b2d',mutedText:'#5e6a5e',border:'#203b2d',dulcePink:'#f0d9d8',dulcePinkLight:'#fff0e9',dulceChocolate:'#6c3b36',green:'#24563b',white:'#fffaf0',redInk:'#98202b',announcementBg:'#1c5139',announcementText:'#fff4dc',announcementDot:'#dbb75c',headerStripeStart:'#1d6845',headerStripeEnd:'#b52331',featureGradientStart:'#1d6845',featureGradientEnd:'#b52331' } },
+    { id: 'ano-nuevo', name: 'Año Nuevo', note: 'Azul noche y champagne', colors: ['#11192c', '#d7b76a', '#f8f3e8'], palette: { primary:'#d7b76a',primaryDark:'#b89445',cream:'#e7cf91',background:'#11192c',surface:'#1c2740',text:'#f8f3e8',mutedText:'#c6c1b7',border:'#f8f3e8',dulcePink:'#30334b',dulcePinkLight:'#f4e9d1',dulceChocolate:'#d7b76a',green:'#8cae9c',white:'#fffaf0',redInk:'#e7cf91',announcementBg:'#0b1223',announcementText:'#e7cf91',announcementDot:'#e7cf91',headerStripeStart:'#d7b76a',headerStripeEnd:'#f7e6b2',featureGradientStart:'#1c2740',featureGradientEnd:'#d7b76a' } },
+    { id: 'san-valentin', name: 'San Valentín', note: 'Rosa suave y borgoña', colors: ['#ae3456', '#efd4db', '#4b2330'], palette: { primary:'#ae3456',primaryDark:'#842542',cream:'#dca4b0',background:'#f5e6e8',surface:'#fff6f6',text:'#4b2330',mutedText:'#785765',border:'#4b2330',dulcePink:'#efd4db',dulcePinkLight:'#fff0f3',dulceChocolate:'#6a3046',green:'#52735e',white:'#fffafb',redInk:'#842542',announcementBg:'#842542',announcementText:'#fff0f3',announcementDot:'#f1c3cf',headerStripeStart:'#ae3456',headerStripeEnd:'#e7b2bf',featureGradientStart:'#ae3456',featureGradientEnd:'#e7b2bf' } }
+  ];
+  const THEME_COLOR_GROUPS = [
+    { title: 'Colores principales', fields: [
+      ['primary','Color principal','Botones, enlaces y acentos'], ['primaryDark','Color principal oscuro','Estados activos y variaciones'], ['cream','Color crema / acento','Detalles claros y fondos de apoyo'], ['background','Fondo general','Fondo principal de toda la página'], ['surface','Tarjetas y superficies','Tarjetas, paneles y bloques'], ['text','Texto principal','Títulos y textos principales'], ['mutedText','Texto secundario','Descripciones y textos suaves'], ['border','Bordes y divisores','El color se aplica con transparencia']
+    ]},
+    { title: 'Cochi Dulce y colores complementarios', fields: [
+      ['dulcePink','Rosa Cochi Dulce','Fondos de la marca dulce'], ['dulcePinkLight','Rosa claro','Superficies claras de Cochi Dulce'], ['dulceChocolate','Chocolate','Textos y acentos de Cochi Dulce'], ['green','Verde complementario','Detalles y estados complementarios'], ['white','Blanco','Elementos de alto contraste'], ['redInk','Texto de acento','Textos destacados y etiquetas']
+    ]},
+    { title: 'Detalles de temporada', fields: [
+      ['announcementBg','Fondo de la franja superior','Banda informativa del encabezado'], ['announcementText','Texto de la franja superior','Texto de la banda informativa'], ['announcementDot','Punto decorativo','Puntos de la banda superior'], ['headerStripeStart','Franja del encabezado – color 1','Primer tono de la línea decorativa'], ['headerStripeEnd','Franja del encabezado – color 2','Segundo tono de la línea decorativa'], ['featureGradientStart','Degradado de tarjetas – inicio','Inicio del degradado decorativo'], ['featureGradientEnd','Degradado de tarjetas – final','Final del degradado decorativo']
+    ]}
   ];
   let data = null, tab = 'temas', dirty = false, openSlug = null, query = '', storage = 'file', fromDefaults = false, toastTimer = null, customers = [], customerQuery = '', orders = [], feeDrafts = {}, preview = null, modalReturnFocus = null, currentReceiptHtml = '', ordersLimit = 50, statsPeriod = '30', selectedCustomerIds = new Set(), campaignText = '¡Hola {nombre}! Tenemos novedades en Cochi. Queremos compartirte nuestros nuevos platillos y promociones. Escríbenos por aquí para conocerlos.', campaignLinksReady = false;
 
@@ -165,11 +176,23 @@
   const VIEWS = {
     temas() {
       const theme = data.settings.theme;
-      const cards = THEME_PRESETS.map(preset => `<button type="button" class="theme-option${theme.preset === preset.id ? ' is-selected' : ''}" data-act="chooseTheme" data-theme-id="${preset.id}" aria-pressed="${theme.preset === preset.id}">
-        <span class="theme-option__swatches">${preset.colors.map(color => `<i style="--swatch:${color}"></i>`).join('')}</span>
+      theme.customColors ||= {};
+      theme.customColors[theme.preset] ||= {};
+      const cards = THEME_PRESETS.map(preset => {
+        const saved = theme.customColors[preset.id] || {};
+        const swatches = ['background','primary','text'].map(key => saved[key] || preset.palette[key]);
+        return `<button type="button" class="theme-option${theme.preset === preset.id ? ' is-selected' : ''}" data-act="chooseTheme" data-theme-id="${preset.id}" aria-pressed="${theme.preset === preset.id}">
+        <span class="theme-option__swatches">${swatches.map(color => `<i style="--swatch:${color}"></i>`).join('')}</span>
         <strong>${preset.name}</strong><small>${preset.note}</small>
         <span class="theme-option__state">${theme.preset === preset.id ? 'Tema seleccionado' : 'Seleccionar tema'}</span>
-      </button>`).join('');
+      </button>`;
+      }).join('');
+      const activePreset = THEME_PRESETS.find(p => p.id === theme.preset) || THEME_PRESETS[0];
+      const activeColors = theme.customColors[theme.preset] || {};
+      const colorGroups = THEME_COLOR_GROUPS.map(group => `<section class="theme-color-group"><h3>${group.title}</h3><div class="theme-color-grid">${group.fields.map(([key,label,hint]) => {
+        const hex = activeColors[key] || activePreset.palette[key];
+        return `<label class="theme-color-field"><span class="theme-color-field__name">${label}</span><div class="theme-color-control"><input type="color" data-theme-color-picker="${key}" data-theme-preset="${theme.preset}" value="${hex}" aria-label="Selector de color: ${label}"><input type="text" data-theme-color-hex="${key}" data-theme-preset="${theme.preset}" data-b="settings.theme.customColors.${theme.preset}.${key}" data-last-valid="${hex}" value="${hex}" maxlength="7" minlength="7" pattern="#[0-9A-Fa-f]{6}" spellcheck="false" autocapitalize="characters" aria-label="Código HEX de ${label}" title="Formato hexadecimal: #RRGGBB"></div><small>${hint}</small></label>`;
+      }).join('')}</div></section>`).join('');
       const assets = [
         { key: 'logoHeader', title: 'Logo principal', subtitle: 'Se muestra en la parte superior del menú', fallback: '/assets/brand/cochi-logo-red.png', upload: 'Subir logo principal' },
         { key: 'logoFooter', title: 'Logo para fondo oscuro', subtitle: 'Se muestra en el pie de página', fallback: '/assets/brand/cochi-logo-cream.png', upload: 'Subir logo de pie de página' },
@@ -178,7 +201,8 @@
         const src = theme[asset.key] || asset.fallback;
         return `<article class="theme-asset"><div class="theme-asset__preview"><img src="${esc(src)}" alt="Vista previa: ${asset.title}"></div><div class="theme-asset__copy"><strong>${asset.title}</strong><small>${asset.subtitle}</small><small>${theme[asset.key] ? 'Logo personalizado cargado' : 'Se usará el logo original de Cochi'}</small><div class="theme-asset__actions"><button type="button" class="btn btn--small" data-act="uploadThemeAsset" data-asset="${asset.key}">${theme[asset.key] ? 'Cambiar imagen' : asset.upload}</button>${theme[asset.key] ? `<button type="button" class="btn btn--danger" data-act="removeThemeAsset" data-asset="${asset.key}">Usar original</button>` : ''}</div></div></article>`;
       }).join('');
-      return `<section class="card"><h2>Temáticas de temporada</h2><p class="card__intro">Elige una temática para cambiar la paleta de colores de todo el menú digital: fondos, textos, botones, secciones y detalles. El cambio se publica cuando pulses <strong>Guardar cambios</strong>.</p><div class="theme-grid">${cards}</div><p class="preview">Tema activo: <strong>${esc(THEME_PRESETS.find(p => p.id === theme.preset)?.name || 'Cochi original')}</strong>. Puedes volver al diseño original en cualquier momento.</p></section>
+      return `<section class="card"><h2>Temáticas de temporada</h2><p class="card__intro">Elige una temática para cambiar la paleta de colores de todo el menú digital: fondos, textos, botones, secciones y detalles. El cambio se publica cuando pulses <strong>Guardar cambios</strong>.</p><div class="theme-grid">${cards}</div><p class="preview">Tema activo: <strong>${esc(activePreset.name)}</strong>. Puedes volver al diseño original en cualquier momento.</p></section>
+        <section class="card"><div class="theme-color-heading"><div><h2>Personalizar colores HEX</h2><p class="card__intro">Edita cada color de <strong>${esc(activePreset.name)}</strong>. Escribe el código hexadecimal o usa el selector visual. Cada temática guarda su propia paleta.</p></div><button type="button" class="btn btn--small" data-act="resetThemeColors">Restablecer paleta</button></div><div class="theme-color-groups">${colorGroups}</div><p class="muted">Usa el formato <strong>#RRGGBB</strong>, por ejemplo <strong>#EB140C</strong>. Los cambios se publican al pulsar Guardar cambios.</p></section>
         <section class="card"><h2>Logos de la temática</h2><p class="card__intro">Sube tus versiones temáticas de Cochi. Puedes dejar cualquiera sin cargar para conservar el logo original. Recomendado: PNG o WebP con fondo transparente.</p><div class="theme-assets">${assets}</div><p class="muted">Cada imagen se optimiza al subirla. Después de cargar o cambiar los logos, recuerda guardar los cambios.</p></section>`;
     },
     tasa() {
@@ -405,7 +429,8 @@
   const ACTIONS = {
     logout: async () => { await api('logout', { method: 'POST', body: '{}' }).catch(() => {}); location.reload(); },
     today: () => { data.settings.exchangeRateDate = today(); markDirty(); render(); },
-    chooseTheme(el) { data.settings.theme.preset = THEME_PRESETS.some(p => p.id === el.dataset.themeId) ? el.dataset.themeId : 'original'; markDirty(); render(); toast('Tema seleccionado. Guarda los cambios para publicarlo.'); },
+    chooseTheme(el) { data.settings.theme.preset = THEME_PRESETS.some(p => p.id === el.dataset.themeId) ? el.dataset.themeId : 'original'; data.settings.theme.customColors ||= {}; data.settings.theme.customColors[data.settings.theme.preset] ||= {}; markDirty(); render(); toast('Tema seleccionado. Puedes personalizar sus HEX y guardar los cambios.'); },
+    resetThemeColors() { const preset = data.settings.theme.preset; if (data.settings.theme.customColors) delete data.settings.theme.customColors[preset]; data.settings.theme.customColors ||= {}; data.settings.theme.customColors[preset] = {}; markDirty(); render(); toast('Se restauró la paleta original de esta temática. Guarda los cambios.'); },
     async uploadThemeAsset(el) { const url = await uploadImage(1200); if (url) { data.settings.theme[el.dataset.asset] = url; markDirty(); render(); } },
     removeThemeAsset(el) { data.settings.theme[el.dataset.asset] = ''; markDirty(); render(); toast('Se usará el recurso original de Cochi.'); },
     save: save,
@@ -499,6 +524,26 @@
     if (event.target.id === 'q') { query = event.target.value; $('#plist').innerHTML = productList(); return; }
     if (event.target.id === 'customerSearch') { customerQuery = event.target.value; const pos = event.target.selectionStart; render(); const input = $('#customerSearch'); input.focus(); input.setSelectionRange(pos, pos); return; }
     if (event.target.id === 'campaignText') { campaignText = event.target.value; campaignLinksReady = false; return; }
+    const picker = event.target.closest('[data-theme-color-picker]');
+    if (picker) {
+      const key = picker.dataset.themeColorPicker, preset = picker.dataset.themePreset, value = picker.value.toUpperCase();
+      const hexInput = document.querySelector(`[data-theme-color-hex="${key}"][data-theme-preset="${preset}"]`);
+      if (hexInput) { hexInput.value = value; hexInput.dataset.lastValid = value; }
+      setPath(`settings.theme.customColors.${preset}.${key}`, value); markDirty(); return;
+    }
+    const hexInput = event.target.closest('[data-theme-color-hex]');
+    if (hexInput) {
+      const value = hexInput.value.trim();
+      if (/^#[0-9a-fA-F]{6}$/.test(value)) {
+        const normalized = value.toUpperCase();
+        hexInput.dataset.lastValid = normalized;
+        hexInput.value = normalized;
+        const pickerInput = document.querySelector(`[data-theme-color-picker="${hexInput.dataset.themeColorHex}"][data-theme-preset="${hexInput.dataset.themePreset}"]`);
+        if (pickerInput) pickerInput.value = normalized;
+        setPath(`settings.theme.customColors.${hexInput.dataset.themePreset}.${hexInput.dataset.themeColorHex}`, normalized); markDirty();
+      }
+      return;
+    }
     const el = event.target.closest('[data-b]'); if (!el) return;
     const kind = el.dataset.t; let value;
     if (el.type === 'checkbox') value = el.checked;
@@ -516,6 +561,12 @@
     }
     if (event.target.id === 'statsPeriod') { statsPeriod = event.target.value; render(); return; }
     const el = event.target.closest('[data-act-change]'); if (el) CHANGES[el.dataset.actChange](el);
+    const hexInput = event.target.closest('[data-theme-color-hex]');
+    if (hexInput && !/^#[0-9a-fA-F]{6}$/.test(hexInput.value.trim())) {
+      hexInput.value = hexInput.dataset.lastValid || '#000000';
+      toast('Código HEX inválido. Usa el formato #RRGGBB.', true);
+      return;
+    }
     const after = event.target.closest('[data-after="rerender"]'); if (after) render();
   });
   window.addEventListener('beforeunload', event => { if (dirty) { event.preventDefault(); event.returnValue = ''; } });
@@ -568,7 +619,9 @@
     data.settings.schedule = base.map(b => ({ ...b, ...((data.settings.schedule || []).find(x => x.day === b.day) || {}) }));
     data.settings.ordersPaused = Boolean(data.settings.ordersPaused);
     const validThemes = THEME_PRESETS.map(item => item.id);
-    data.settings.theme = { preset: validThemes.includes(data.settings.theme?.preset) ? data.settings.theme.preset : 'original', logoHeader: data.settings.theme?.logoHeader || '', logoFooter: data.settings.theme?.logoFooter || '', isotipo: data.settings.theme?.isotipo || '' };
+    const savedTheme = data.settings.theme || {};
+    data.settings.theme = { preset: validThemes.includes(savedTheme.preset) ? savedTheme.preset : 'original', logoHeader: savedTheme.logoHeader || '', logoFooter: savedTheme.logoFooter || '', isotipo: savedTheme.isotipo || '', customColors: savedTheme.customColors && typeof savedTheme.customColors === 'object' && !Array.isArray(savedTheme.customColors) ? savedTheme.customColors : {} };
+    data.settings.theme.customColors[data.settings.theme.preset] ||= {};
     data.cp = await api('coupons').then(r => r.coupons).catch(() => ({ enabled: false, coupons: [] }));
     $('#login').hidden = true; $('#app').hidden = false; markDirty(false); render();
   }

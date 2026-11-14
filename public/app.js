@@ -50,16 +50,35 @@
   function applyTheme(themeConfig = {}) {
     const allowed = ['original', 'black-friday', 'navidad', 'ano-nuevo', 'san-valentin'];
     const preset = allowed.includes(themeConfig.preset) ? themeConfig.preset : 'original';
-    document.documentElement.dataset.cochiTheme = preset;
+    const root = document.documentElement;
+    root.dataset.cochiTheme = preset;
     const headerLogo = safeAssetPath(themeConfig.logoHeader) || '/assets/brand/cochi-logo-red.png';
     const footerLogo = safeAssetPath(themeConfig.logoFooter) || '/assets/brand/cochi-logo-cream.png';
     document.querySelectorAll('[data-cochi-logo="header"]').forEach(img => { img.src = headerLogo; });
     document.querySelectorAll('[data-cochi-logo="footer"]').forEach(img => { img.src = footerLogo; });
     const isotipo = safeAssetPath(themeConfig.isotipo);
     document.querySelectorAll('[data-cochi-isotipo]').forEach(img => { img.src = isotipo || img.dataset.defaultSrc || img.src; });
-    const colors = { original: '#ebe0bf', 'black-friday': '#151515', navidad: '#f2ecda', 'ano-nuevo': '#11192c', 'san-valentin': '#f5e6e8' };
+    const cssVariables = {
+      primary:'--cochi-red', primaryDark:'--cochi-red-deep', cream:'--cochi-cream', background:'--paper', surface:'--paper-light',
+      text:'--ink', mutedText:'--ink-soft', dulcePink:'--dulce-pink', dulcePinkLight:'--dulce-pink-light', dulceChocolate:'--dulce-chocolate',
+      green:'--green', white:'--white', redInk:'--red-ink', announcementBg:'--theme-announcement-bg', announcementText:'--theme-announcement-text',
+      announcementDot:'--theme-announcement-dot', headerStripeStart:'--theme-header-stripe-start', headerStripeEnd:'--theme-header-stripe-end',
+      featureGradientStart:'--theme-feature-gradient-start', featureGradientEnd:'--theme-feature-gradient-end'
+    };
+    Object.values(cssVariables).forEach(name => root.style.removeProperty(name));
+    root.style.removeProperty('--line');
+    const custom = themeConfig.customColors && typeof themeConfig.customColors === 'object' ? themeConfig.customColors[preset] : null;
+    const validHex = value => typeof value === 'string' && /^#[0-9a-fA-F]{6}$/.test(value);
+    if (custom && typeof custom === 'object') {
+      Object.entries(cssVariables).forEach(([key, variable]) => {
+        const value = custom[key];
+        if (validHex(value)) root.style.setProperty(variable, value.toUpperCase());
+      });
+      if (validHex(custom.border)) root.style.setProperty('--line', `color-mix(in srgb, ${custom.border.toUpperCase()} 18%, transparent)`);
+    }
+    const defaultBackgrounds = { original: '#f5f0dc', 'black-friday': '#151515', navidad: '#f2ecda', 'ano-nuevo': '#11192c', 'san-valentin': '#f5e6e8' };
     const themeColor = document.querySelector('meta[name="theme-color"]');
-    if (themeColor) themeColor.content = colors[preset] || colors.original;
+    if (themeColor) themeColor.content = validHex(custom?.background) ? custom.background.toUpperCase() : defaultBackgrounds[preset];
   }
   function currencyUSD(value) {
     return '$' + Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
