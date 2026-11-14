@@ -47,6 +47,20 @@
       return ['https:', 'http:'].includes(parsed.protocol) ? parsed.href : '';
     } catch { return ''; }
   }
+  function applyTheme(themeConfig = {}) {
+    const allowed = ['original', 'black-friday', 'navidad', 'ano-nuevo', 'san-valentin'];
+    const preset = allowed.includes(themeConfig.preset) ? themeConfig.preset : 'original';
+    document.documentElement.dataset.cochiTheme = preset;
+    const headerLogo = safeAssetPath(themeConfig.logoHeader) || '/assets/brand/cochi-logo-red.png';
+    const footerLogo = safeAssetPath(themeConfig.logoFooter) || '/assets/brand/cochi-logo-cream.png';
+    document.querySelectorAll('[data-cochi-logo="header"]').forEach(img => { img.src = headerLogo; });
+    document.querySelectorAll('[data-cochi-logo="footer"]').forEach(img => { img.src = footerLogo; });
+    const isotipo = safeAssetPath(themeConfig.isotipo);
+    document.querySelectorAll('[data-cochi-isotipo]').forEach(img => { img.src = isotipo || img.dataset.defaultSrc || img.src; });
+    const colors = { original: '#ebe0bf', 'black-friday': '#151515', navidad: '#f2ecda', 'ano-nuevo': '#11192c', 'san-valentin': '#f5e6e8' };
+    const themeColor = document.querySelector('meta[name="theme-color"]');
+    if (themeColor) themeColor.content = colors[preset] || colors.original;
+  }
   function currencyUSD(value) {
     return '$' + Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
@@ -824,8 +838,10 @@
     try {
       const settings = contentApi?.settings || await fetch('/data/settings.json', { cache: 'no-store' }).then(readJSONResponse);
       config = { ...defaultConfig, ...settings };
+      applyTheme(config.theme || {});
     } catch {
       config = { ...defaultConfig };
+      applyTheme({});
     }
     if (!Array.isArray(config.orderModes) || !config.orderModes.length) config.orderModes = ['delivery', 'pickup'];
     const usdVES = Number(config.usdToVes);

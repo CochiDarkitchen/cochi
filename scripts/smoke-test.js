@@ -210,9 +210,19 @@ async function waitForServer(url, child) {
     const up = await fetch(`${base}/api/admin/upload`, { method: 'POST', headers: auth, body: JSON.stringify({ dataUrl: `data:image/webp;base64,${webp.toString('base64')}` }) });
     assert.equal(up.status, 200); const { url } = await up.json(); assert.match(url, /^\/api\/img\/[\w-]+$/);
     const served = await fetch(`${base}${url}`); assert.equal(served.status, 200); assert.equal(served.headers.get('content-type'), 'image/webp');
+    const seasonal = JSON.parse(JSON.stringify(draft));
+    seasonal.settings.theme = { preset: 'navidad', logoHeader: url, logoFooter: '', isotipo: url };
+    assert.equal((await put(seasonal)).status, 200, 'El admin debe poder guardar una temática y sus logos.');
+    const seasonalSaved = await (await fetch(`${base}/api/content`)).json();
+    assert.equal(seasonalSaved.settings.theme.preset, 'navidad');
+    assert.equal(seasonalSaved.settings.theme.logoHeader, url);
+    assert.equal(seasonalSaved.settings.theme.isotipo, url);
+    const unsafeTheme = JSON.parse(JSON.stringify(seasonal)); unsafeTheme.settings.theme.logoHeader = 'https://sitio-externo.com/logo.png';
+    assert.equal((await put(unsafeTheme)).status, 400, 'Los logos temáticos solo pueden usar imágenes del sitio.');
     const fake = await fetch(`${base}/api/admin/upload`, { method: 'POST', headers: auth, body: JSON.stringify({ dataUrl: `data:image/webp;base64,${Buffer.from('no soy una imagen').toString('base64')}` }) });
     assert.equal(fake.status, 400, 'Un archivo que no es imagen se rechaza.');
     ok('Panel admin: login, sesión segura, guardado validado, protección de origen y subida de imágenes.');
+    ok('Temas: paleta de temporada y logos personalizados guardados y validados en el contenido público.');
     ok('Cupones: lectura y guardado desde el panel, validación pública y conteo de usos comprobados.')
     const withExtras = JSON.parse(JSON.stringify(draft));
     withExtras.products[0].tag = 'Más pedido'; withExtras.settings.paymentInfo = 'Pago Móvil 0424-0000000'; withExtras.flyers[0].start = '2026-11-01'; withExtras.flyers[0].end = '2026-11-03';

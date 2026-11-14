@@ -373,3 +373,53 @@ legend b,label b,fieldset b{color:var(--red-ink)}
 
 /* Consentimiento opcional para comunicaciones promocionales */
 .marketing-consent{display:flex;align-items:flex-start;gap:10px;margin:14px 0;padding:12px 14px;border:1px solid rgba(40,35,28,.16);border-radius:12px;font-size:.82rem;line-height:1.45;color:inherit}.marketing-consent input{margin-top:3px;flex:0 0 auto;accent-color:#ed140c}
+
+
+/* ---------- Temáticas de temporada de Cochi ---------- */
+html[data-cochi-theme="black-friday"]{
+  --cochi-red:#e0b34d;--cochi-red-deep:#ba8c29;--cochi-cream:#e9c875;
+  --paper:#151515;--paper-light:#22211f;--ink:#f8f2e7;--ink-soft:#c9c1b1;--line:rgba(248,242,231,.17);
+  --dulce-pink:#302b26;--dulce-pink-light:#f5ead6;--dulce-chocolate:#e0b34d;--green:#80a98a;--white:#fffaf0;--red-ink:#e9c875;
+  color-scheme:dark;
+}
+html[data-cochi-theme="navidad"]{
+  --cochi-red:#b52331;--cochi-red-deep:#8f1925;--cochi-cream:#dbb75c;
+  --paper:#f2ecda;--paper-light:#fff9eb;--ink:#203b2d;--ink-soft:#5e6a5e;--line:rgba(32,59,45,.18);
+  --dulce-pink:#f0d9d8;--dulce-pink-light:#fff0e9;--dulce-chocolate:#6c3b36;--green:#24563b;--white:#fffaf0;--red-ink:#98202b;
+  color-scheme:light;
+}
+html[data-cochi-theme="ano-nuevo"]{
+  --cochi-red:#d7b76a;--cochi-red-deep:#b89445;--cochi-cream:#e7cf91;
+  --paper:#11192c;--paper-light:#1c2740;--ink:#f8f3e8;--ink-soft:#c6c1b7;--line:rgba(248,243,232,.18);
+  --dulce-pink:#30334b;--dulce-pink-light:#f4e9d1;--dulce-chocolate:#d7b76a;--green:#8cae9c;--white:#fffaf0;--red-ink:#e7cf91;
+  color-scheme:dark;
+}
+html[data-cochi-theme="san-valentin"]{
+  --cochi-red:#ae3456;--cochi-red-deep:#842542;--cochi-cream:#dca4b0;
+  --paper:#f5e6e8;--paper-light:#fff6f6;--ink:#4b2330;--ink-soft:#785765;--line:rgba(75,35,48,.17);
+  --dulce-pink:#efd4db;--dulce-pink-light:#fff0f3;--dulce-chocolate:#6a3046;--green:#52735e;--white:#fffafb;--red-ink:#842542;
+  color-scheme:light;
+}
+html[data-cochi-theme]:not([data-cochi-theme="original"]) .site-header{
+  background:color-mix(in srgb,var(--paper) 96%,transparent);border-bottom-color:var(--line)
+}
+html[data-cochi-theme]:not([data-cochi-theme="original"]) .site-header.is-scrolled{background:color-mix(in srgb,var(--paper) 97%,transparent)}
+html[data-cochi-theme]:not([data-cochi-theme="original"]) .desktop-nav a{color:var(--ink-soft)}
+html[data-cochi-theme]:not([data-cochi-theme="original"]) .hero__lead,
+html[data-cochi-theme]:not([data-cochi-theme="original"]) .hero__footnote,
+html[data-cochi-theme]:not([data-cochi-theme="original"]) .menu-title-row p{color:var(--ink-soft)}
+html[data-cochi-theme]:not([data-cochi-theme="original"]) .hero-art__image-frame{border-color:var(--paper)}
+html[data-cochi-theme]:not([data-cochi-theme="original"]) .hero-art__scribble{background:var(--paper);color:var(--cochi-red);border-color:var(--cochi-red)}
+html[data-cochi-theme]:not([data-cochi-theme="original"]) .mobile-order-bar{background:linear-gradient(180deg,color-mix(in srgb,var(--paper) 0%,transparent),color-mix(in srgb,var(--paper) 97%,transparent) 24%)}
+html[data-cochi-theme="black-friday"] .announcement{background:#080808;color:#f1cc72}
+html[data-cochi-theme="black-friday"] .announcement__dot{background:#f1cc72}
+html[data-cochi-theme="black-friday"] .featured-card--light .featured-card__placeholder{background:linear-gradient(140deg,#77551b,#d0a33e)}
+html[data-cochi-theme="navidad"] .announcement{background:#1c5139;color:#fff4dc}
+html[data-cochi-theme="navidad"] .announcement__dot{background:#dbb75c}
+html[data-cochi-theme="navidad"] .site-header::after{background:linear-gradient(90deg,#1d6845 0 48%,#b52331 48% 100%)}
+html[data-cochi-theme="ano-nuevo"] .announcement{background:#0b1223;color:#e7cf91}
+html[data-cochi-theme="ano-nuevo"] .announcement__dot{background:#e7cf91}
+html[data-cochi-theme="ano-nuevo"] .site-header::after{background:linear-gradient(90deg,#d7b76a,#f7e6b2,#d7b76a)}
+html[data-cochi-theme="san-valentin"] .announcement{background:#842542;color:#fff0f3}
+html[data-cochi-theme="san-valentin"] .announcement__dot{background:#f1c3cf}
+html[data-cochi-theme="san-valentin"] .site-header::after{background:linear-gradient(90deg,#ae3456,#e7b2bf,#ae3456)}

@@ -117,3 +117,25 @@ body.modal-open{overflow:hidden}
 .paper iframe{display:block;width:58mm;border:0;background:#fff}
 .paper::after{content:"";position:absolute;left:0;right:0;top:100%;height:6px;background:#fff;-webkit-mask:conic-gradient(from -45deg at bottom,#0000,#000 1deg 90deg,#0000 91deg) 50%/12px 100%;mask:conic-gradient(from -45deg at bottom,#0000,#000 1deg 90deg,#0000 91deg) 50%/12px 100%;filter:drop-shadow(0 2px 2px rgba(0,0,0,.18))}
 @media(max-width:560px){.modal{padding:0;place-items:stretch}.modal__box{width:100%;max-height:none;height:100dvh;border-radius:0}.paper-wrap{--zoom:1.25}}
+
+
+/* Temáticas de temporada */
+.theme-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.theme-option{display:grid;gap:7px;min-width:0;padding:13px;text-align:left;border:2px solid var(--line);border-radius:18px;background:var(--paper-light);cursor:pointer;transition:border-color .2s,transform .2s,background .2s}
+.theme-option:hover{transform:translateY(-2px);border-color:var(--red)}
+.theme-option.is-selected{border-color:var(--red);background:var(--cream);box-shadow:0 0 0 2px color-mix(in srgb,var(--red) 15%,transparent)}
+.theme-option__swatches{display:flex;height:36px;overflow:hidden;border-radius:10px}
+.theme-option__swatches i{flex:1;background:var(--swatch)}
+.theme-option strong{font-size:14px;line-height:1.2}
+.theme-option small{font-size:11px;color:var(--soft);line-height:1.4}
+.theme-option__state{font-size:11px;font-weight:900;color:var(--red)}
+.theme-assets{display:grid;gap:12px}
+.theme-asset{display:grid;grid-template-columns:104px minmax(0,1fr);gap:13px;align-items:center;padding:12px;border:1px solid var(--line);border-radius:16px;background:var(--paper-light)}
+.theme-asset__preview{width:104px;height:94px;display:grid;place-items:center;padding:8px;border-radius:12px;background:var(--cream);overflow:hidden}
+.theme-asset__preview img{max-width:100%;max-height:100%;object-fit:contain}
+.theme-asset__copy{display:grid;gap:5px;min-width:0}
+.theme-asset__copy strong{font-size:14px}
+.theme-asset__copy small{font-size:11px;color:var(--soft);line-height:1.4}
+.theme-asset__actions{display:flex;flex-wrap:wrap;gap:7px;margin-top:5px}
+.theme-asset__actions .btn{min-height:38px;padding:0 11px;font-size:11px}
+@media(max-width:520px){.theme-grid{grid-template-columns:1fr 1fr}.theme-option{padding:10px}.theme-option strong{font-size:12px}.theme-asset{grid-template-columns:76px minmax(0,1fr);gap:10px;padding:10px}.theme-asset__preview{width:76px;height:76px}.theme-asset__actions .btn{flex:1}}

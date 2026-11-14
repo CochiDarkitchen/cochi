@@ -63,6 +63,14 @@ En el panel privado aparecen tres pestañas nuevas:
 
 Los registros se guardan en el mismo almacenamiento Upstash conectado al proyecto de Vercel. No hace falta crear otra cuenta, tabla ni servicio para esta ampliación. En modo local, se guardan dentro de la carpeta `storage/`. Los pedidos anteriores que ya estaban dentro del historial de clientes se incorporan a la vista general; las versiones previas conservaban hasta 30 pedidos por cliente, por lo que el historial más antiguo que ya no existía en ese registro no se puede reconstruir.
 
+## Temáticas de temporada y logos de Cochi
+
+En el panel privado (`/admin`) abre la pestaña **Temas**. Allí puedes activar **Cochi original**, **Black Friday**, **Navidad**, **Año Nuevo** o **San Valentín**. La selección cambia la paleta de la página (fondos, textos, botones, acentos y secciones) y se publica cuando pulses **Guardar cambios**. Para volver al diseño habitual, selecciona **Cochi original**.
+
+En esa misma pestaña puedes cargar tres recursos independientes: logo del encabezado, logo para el pie de página (fondo oscuro) e isotipo del cerdito. Se optimizan y guardan en el almacenamiento que ya utiliza el proyecto; si no cargas una versión temática, el sitio conserva el recurso original de Cochi. Recomendado: PNG o WebP con transparencia.
+
+Los temas no cambian productos, precios, disponibilidad ni datos de pedidos. Solo cambian la presentación visual y los recursos de marca que hayas subido.
+
 ## Etiquetas, WhatsApp flotante, confirmación, fechas y app instalable
 
 - **Etiquetas de producto:** en el panel, dentro de "Editar" de cada producto, escribe una etiqueta corta (Nuevo, Más pedido, Picante...). Sale sobre la foto en el menú y en la ficha del producto.

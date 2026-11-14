@@ -2,8 +2,15 @@
   'use strict';
   const $ = (s, r = document) => r.querySelector(s);
   const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const TABS = [['tasa', 'Tasa y datos'], ['horario', 'Horario'], ['productos', 'Productos'], ['flyers', 'Flyers'], ['comentarios', 'Comentarios'], ['ofertas', 'Ofertas y avisos'], ['cupones', 'Cupones'], ['comandas', 'Comandas'], ['estadisticas', 'Estadísticas'], ['clientes', 'Clientes']];
-  let data = null, tab = 'tasa', dirty = false, openSlug = null, query = '', storage = 'file', fromDefaults = false, toastTimer = null, customers = [], customerQuery = '', orders = [], feeDrafts = {}, preview = null, modalReturnFocus = null, currentReceiptHtml = '', ordersLimit = 50, statsPeriod = '30', selectedCustomerIds = new Set(), campaignText = '¡Hola {nombre}! Tenemos novedades en Cochi. Queremos compartirte nuestros nuevos platillos y promociones. Escríbenos por aquí para conocerlos.', campaignLinksReady = false;
+  const TABS = [['temas', 'Temas'], ['tasa', 'Tasa y datos'], ['horario', 'Horario'], ['productos', 'Productos'], ['flyers', 'Flyers'], ['comentarios', 'Comentarios'], ['ofertas', 'Ofertas y avisos'], ['cupones', 'Cupones'], ['comandas', 'Comandas'], ['estadisticas', 'Estadísticas'], ['clientes', 'Clientes']];
+  const THEME_PRESETS = [
+    { id: 'original', name: 'Cochi original', note: 'Rojo intenso y crema', colors: ['#eb140c', '#e6e0bf', '#211e1a'] },
+    { id: 'black-friday', name: 'Black Friday', note: 'Negro, dorado y alto contraste', colors: ['#151515', '#e4b64e', '#f8f2e7'] },
+    { id: 'navidad', name: 'Navidad', note: 'Rojo festivo, verde y dorado', colors: ['#b52331', '#24563b', '#dbb75c'] },
+    { id: 'ano-nuevo', name: 'Año Nuevo', note: 'Azul noche y champagne', colors: ['#11192c', '#d7b76a', '#f8f3e8'] },
+    { id: 'san-valentin', name: 'San Valentín', note: 'Rosa suave y borgoña', colors: ['#ae3456', '#efd4db', '#4b2330'] }
+  ];
+  let data = null, tab = 'temas', dirty = false, openSlug = null, query = '', storage = 'file', fromDefaults = false, toastTimer = null, customers = [], customerQuery = '', orders = [], feeDrafts = {}, preview = null, modalReturnFocus = null, currentReceiptHtml = '', ordersLimit = 50, statsPeriod = '30', selectedCustomerIds = new Set(), campaignText = '¡Hola {nombre}! Tenemos novedades en Cochi. Queremos compartirte nuestros nuevos platillos y promociones. Escríbenos por aquí para conocerlos.', campaignLinksReady = false;
 
   async function api(path, options = {}) {
     const response = await fetch(`/api/admin/${path}`, { credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, ...options });
@@ -156,6 +163,24 @@
 
   /* ---------- Pestañas ---------- */
   const VIEWS = {
+    temas() {
+      const theme = data.settings.theme;
+      const cards = THEME_PRESETS.map(preset => `<button type="button" class="theme-option${theme.preset === preset.id ? ' is-selected' : ''}" data-act="chooseTheme" data-theme-id="${preset.id}" aria-pressed="${theme.preset === preset.id}">
+        <span class="theme-option__swatches">${preset.colors.map(color => `<i style="--swatch:${color}"></i>`).join('')}</span>
+        <strong>${preset.name}</strong><small>${preset.note}</small>
+        <span class="theme-option__state">${theme.preset === preset.id ? 'Tema seleccionado' : 'Seleccionar tema'}</span>
+      </button>`).join('');
+      const assets = [
+        { key: 'logoHeader', title: 'Logo principal', subtitle: 'Se muestra en la parte superior del menú', fallback: '/assets/brand/cochi-logo-red.png', upload: 'Subir logo principal' },
+        { key: 'logoFooter', title: 'Logo para fondo oscuro', subtitle: 'Se muestra en el pie de página', fallback: '/assets/brand/cochi-logo-cream.png', upload: 'Subir logo de pie de página' },
+        { key: 'isotipo', title: 'Isotipo / cerdito', subtitle: 'Se usa en la intro y los detalles de marca', fallback: '/assets/brand/cochi-isotipo-red.png', upload: 'Subir isotipo' }
+      ].map(asset => {
+        const src = theme[asset.key] || asset.fallback;
+        return `<article class="theme-asset"><div class="theme-asset__preview"><img src="${esc(src)}" alt="Vista previa: ${asset.title}"></div><div class="theme-asset__copy"><strong>${asset.title}</strong><small>${asset.subtitle}</small><small>${theme[asset.key] ? 'Logo personalizado cargado' : 'Se usará el logo original de Cochi'}</small><div class="theme-asset__actions"><button type="button" class="btn btn--small" data-act="uploadThemeAsset" data-asset="${asset.key}">${theme[asset.key] ? 'Cambiar imagen' : asset.upload}</button>${theme[asset.key] ? `<button type="button" class="btn btn--danger" data-act="removeThemeAsset" data-asset="${asset.key}">Usar original</button>` : ''}</div></div></article>`;
+      }).join('');
+      return `<section class="card"><h2>Temáticas de temporada</h2><p class="card__intro">Elige una temática para cambiar la paleta de colores de todo el menú digital: fondos, textos, botones, secciones y detalles. El cambio se publica cuando pulses <strong>Guardar cambios</strong>.</p><div class="theme-grid">${cards}</div><p class="preview">Tema activo: <strong>${esc(THEME_PRESETS.find(p => p.id === theme.preset)?.name || 'Cochi original')}</strong>. Puedes volver al diseño original en cualquier momento.</p></section>
+        <section class="card"><h2>Logos de la temática</h2><p class="card__intro">Sube tus versiones temáticas de Cochi. Puedes dejar cualquiera sin cargar para conservar el logo original. Recomendado: PNG o WebP con fondo transparente.</p><div class="theme-assets">${assets}</div><p class="muted">Cada imagen se optimiza al subirla. Después de cargar o cambiar los logos, recuerda guardar los cambios.</p></section>`;
+    },
     tasa() {
       const s = data.settings, sample = data.products.find(p => p.slug === 'shawarma-cesar') || data.products[0];
       return `<section class="card"><h2>Tasa BCV</h2><p class="card__intro">Cambia el valor y la fecha cada vez que cambie la tasa. Los precios en bolívares del sitio se calculan solos.</p>
@@ -380,6 +405,9 @@
   const ACTIONS = {
     logout: async () => { await api('logout', { method: 'POST', body: '{}' }).catch(() => {}); location.reload(); },
     today: () => { data.settings.exchangeRateDate = today(); markDirty(); render(); },
+    chooseTheme(el) { data.settings.theme.preset = THEME_PRESETS.some(p => p.id === el.dataset.themeId) ? el.dataset.themeId : 'original'; markDirty(); render(); toast('Tema seleccionado. Guarda los cambios para publicarlo.'); },
+    async uploadThemeAsset(el) { const url = await uploadImage(1200); if (url) { data.settings.theme[el.dataset.asset] = url; markDirty(); render(); } },
+    removeThemeAsset(el) { data.settings.theme[el.dataset.asset] = ''; markDirty(); render(); toast('Se usará el recurso original de Cochi.'); },
     save: save,
     addProduct() {
       const name = prompt('Nombre del nuevo producto:'); if (!name || !name.trim()) return;
@@ -539,6 +567,8 @@
     const base = [0, 1, 2, 3, 4, 5, 6].map(day => ({ day, open: [5, 6, 0].includes(day), from: '00:00', to: '23:59' }));
     data.settings.schedule = base.map(b => ({ ...b, ...((data.settings.schedule || []).find(x => x.day === b.day) || {}) }));
     data.settings.ordersPaused = Boolean(data.settings.ordersPaused);
+    const validThemes = THEME_PRESETS.map(item => item.id);
+    data.settings.theme = { preset: validThemes.includes(data.settings.theme?.preset) ? data.settings.theme.preset : 'original', logoHeader: data.settings.theme?.logoHeader || '', logoFooter: data.settings.theme?.logoFooter || '', isotipo: data.settings.theme?.isotipo || '' };
     data.cp = await api('coupons').then(r => r.coupons).catch(() => ({ enabled: false, coupons: [] }));
     $('#login').hidden = true; $('#app').hidden = false; markDirty(false); render();
   }
