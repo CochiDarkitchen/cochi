@@ -150,3 +150,101 @@ body.modal-open{overflow:hidden}
 .theme-asset__actions{display:flex;flex-wrap:wrap;gap:7px;margin-top:5px}
 .theme-asset__actions .btn{min-height:38px;padding:0 11px;font-size:11px}
 @media(max-width:520px){.theme-grid{grid-template-columns:1fr 1fr}.theme-option{padding:10px}.theme-option strong{font-size:12px}.theme-asset{grid-template-columns:76px minmax(0,1fr);gap:10px;padding:10px}.theme-asset__preview{width:76px;height:76px}.theme-asset__actions .btn{flex:1}}
+
+/* =====================================================================
+   VERSIÓN 2 · Panel: Inicio, seguimiento de comandas y herramientas
+   ===================================================================== */
+.section-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.head-actions{display:flex;flex-wrap:wrap;gap:8px}
+.subheading{margin:6px 0 0;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--soft)}
+
+/* Estado de la tienda (pestaña Inicio) */
+.status-card{grid-template-columns:1fr;align-items:center;color:#fff;border:0;background:linear-gradient(130deg,#1c7a3d,#14532d)}
+.status-card--closed{background:linear-gradient(130deg,#3a342c,#211e1a)}
+.status-card--paused{background:linear-gradient(130deg,#c90f09,#8c0b06)}
+.status-card__main{display:flex;gap:14px;align-items:flex-start}
+.status-card__main small{display:block;font-size:12px;font-weight:700;opacity:.85}
+.status-card__main h2{margin:4px 0 4px;font-size:24px;line-height:1.1;color:#fff}
+.status-card__main p{margin:0;font-size:14px;opacity:.92;line-height:1.45}
+.status-card__dot{width:14px;height:14px;margin-top:6px;border-radius:50%;background:#7CF2A8;flex:none;animation:dotPulse 2s ease-out infinite}
+.status-card--closed .status-card__dot{background:#c9c1b1;animation:none}
+.status-card--paused .status-card__dot{background:#ffd5d2;animation:none}
+.status-card .btn{justify-self:start;border-color:#fff;color:#fff}
+.btn--light{background:#fff!important;color:var(--ink)!important;border-color:#fff!important}
+.status-card .btn--red{background:#fff;color:#c90f09;border-color:#fff}
+@keyframes dotPulse{0%{box-shadow:0 0 0 0 rgba(124,242,168,.6)}70%{box-shadow:0 0 0 12px rgba(124,242,168,0)}100%{box-shadow:0 0 0 0 rgba(124,242,168,0)}}
+@media(min-width:700px){.status-card{grid-template-columns:1fr auto}.status-card .btn{justify-self:end}}
+
+/* Métricas */
+.metric-grid--4{grid-template-columns:repeat(2,minmax(0,1fr))}
+@media(min-width:700px){.metric-grid--4{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.metric--alert{border-color:var(--red);background:#fff1f0}
+.metric--alert strong{color:var(--red)}
+
+/* Pedidos por confirmar (Inicio) */
+.mini-orders{display:grid;gap:8px}
+.mini-order{display:grid;grid-template-columns:auto 1fr auto;grid-template-areas:"id who total" "id time total";align-items:center;gap:2px 12px;width:100%;padding:11px 14px;border:1px solid var(--line);border-left:4px solid #e0a800;border-radius:14px;background:#fff;text-align:left;cursor:pointer;font:inherit;color:var(--ink);transition:transform .15s,box-shadow .15s}
+.mini-order:hover{transform:translateY(-1px);box-shadow:0 8px 20px -12px rgba(0,0,0,.35)}
+.mini-order__id{grid-area:id;font-weight:900;font-size:13px}
+.mini-order__who{grid-area:who;font-size:13px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mini-order strong{grid-area:total;font-size:15px}
+.mini-order small{grid-area:time;font-size:11.5px;color:var(--soft)}
+.empty-ok{margin:0;padding:12px 14px;border-radius:14px;background:#d8f0df;color:#14532d;font-weight:700;font-size:14px}
+
+/* Aviso de actualización automática */
+.live-note{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin:0;font-size:12.5px}
+.live-dot{width:8px;height:8px;border-radius:50%;background:#1c7a3d;animation:dotPulse 2s ease-out infinite}
+.linkbtn{border:0;background:none;padding:0;color:var(--red-deep);font:inherit;font-weight:800;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+
+/* Filtros tipo píldora */
+.filters{display:flex;gap:7px;overflow-x:auto;padding:2px 0 4px;scrollbar-width:none}
+.filters::-webkit-scrollbar{display:none}
+.fchip{flex:none;display:inline-flex;align-items:center;gap:6px;min-height:38px;padding:0 14px;border:1.5px solid var(--line);border-radius:99px;background:#fff;color:var(--ink);font:inherit;font-size:13px;font-weight:800;cursor:pointer;transition:background .15s,border-color .15s,color .15s}
+.fchip b{display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 6px;border-radius:99px;background:var(--paper);font-size:11.5px}
+.fchip.is-on{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+.fchip.is-on b{background:var(--red);color:#fff}
+.chk--pill{display:inline-flex;align-items:center;gap:7px;min-height:44px;padding:0 14px;border:1.5px solid var(--line);border-radius:99px;background:#fff;font-weight:700;font-size:13px;white-space:nowrap}
+
+/* Estados de la comanda */
+.chip--prep{background:#e4e7ff;color:#2a2f8f}
+.chip--ready{background:#d9f2ff;color:#04506e}
+.chip--done{background:#e9e6df;color:#3d3a33}
+.order-card{border-left:5px solid var(--line)}
+.order-card--pending{border-left-color:#e0a800}
+.order-card--confirmed{border-left-color:#1c7a3d}
+.order-card--preparing{border-left-color:#4b52d1}
+.order-card--ready{border-left-color:#0a87b8}
+.order-card--delivered{border-left-color:#9a9283;opacity:.92}
+.order-card--cancelled{border-left-color:#b30e08;opacity:.75}
+.progress{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin:0;padding:0;list-style:none;counter-reset:step}
+.progress li{position:relative;padding-top:12px;font-size:11px;font-weight:800;color:var(--soft);text-align:center}
+.progress li::before{content:"";position:absolute;top:0;left:0;right:0;height:6px;border-radius:99px;background:#e6e0d2}
+.progress li.is-done::before{background:#1c7a3d}
+.progress li.is-now::before{background:var(--red)}
+.progress li.is-now{color:var(--ink)}
+.btn--wa{border-color:#1c7a3d;color:#14532d;background:#e9f7ee}
+.btn--wa::before{content:"";width:8px;height:8px;border-radius:50%;background:#25d366}
+.btn--icon{min-width:40px;padding:0 10px;font-size:16px}
+.order-btns{display:inline-flex;gap:6px;margin-left:auto}
+
+/* ¿Qué hay hoy? (disponibilidad rápida) */
+.stock-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px}
+.stock{position:relative;display:grid;gap:2px;padding:11px 12px 11px 40px;border:1.5px solid #bfe3cb;border-radius:14px;background:#f2fbf5;cursor:pointer;transition:background .15s,border-color .15s}
+.stock input{position:absolute;opacity:0;pointer-events:none}
+.stock::before{content:"";position:absolute;left:12px;top:13px;width:18px;height:18px;border-radius:50%;background:#1c7a3d;box-shadow:inset 0 0 0 4px #f2fbf5}
+.stock__name{font-size:13px;font-weight:800;line-height:1.25}
+.stock__state{font-size:11.5px;font-weight:700;color:#1c7a3d}
+.stock.is-out{border-color:#f3b8b4;background:#fff3f2}
+.stock.is-out::before{background:#b30e08;box-shadow:inset 0 0 0 4px #fff3f2}
+.stock.is-out .stock__state{color:#b30e08}
+.stock:focus-within{outline:3px solid var(--ink);outline-offset:2px}
+
+/* Editor de opciones del producto */
+.opt-editor{display:grid;gap:10px;padding:14px;border:1.5px dashed var(--line);border-radius:16px;background:#fff}
+.opt-editor > p{margin:0}
+.opt-group{display:grid;gap:10px;padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--paper-light)}
+.choice-row{display:grid;grid-template-columns:1fr 110px auto;gap:8px;align-items:end}
+.field--inline{display:inline-flex;align-items:center;gap:8px;margin-left:auto;font-size:13px;font-weight:700}
+.field--inline select{min-height:40px;width:auto}
+@media(max-width:440px){.choice-row{grid-template-columns:1fr 84px auto}.order-btns{margin-left:0}}
+@media (prefers-reduced-motion:reduce){.status-card__dot,.live-dot{animation:none}}

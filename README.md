@@ -2,10 +2,14 @@
 
 Esta versión está pensada para que el cliente vea el menú, elija sus productos y nos escriba por WhatsApp. El cliente no necesita crear una cuenta. El panel privado de administración sí requiere variables de acceso y una base de datos Upstash conectada en Vercel. La web no cobra ni confirma pagos: el equipo de Cochi coordina por WhatsApp la disponibilidad, el monto final y el depósito.
 
-## Novedades de esta versión
+## Versión 2 (noviembre 2026)
+
+Menú por secciones con barra fija, botón "Añadir" directo, estado "Abierto/Cerrado" en vivo, repetir último pedido, sugerencias en el carrito, datos recordados, compartir platos; y en el panel: pestaña Inicio, seguimiento de comandas (en preparación, en camino, entregada, cancelada), mensajes de WhatsApp listos, aviso de pedidos nuevos, editor de opciones, filtros y descarga para Excel. **Detalle completo e instrucciones para publicarla en [LEEME-PRIMERO.md](LEEME-PRIMERO.md).**
+
+## Novedades de la versión anterior
 
 - **Animaciones tipo motion graphics:** intro con anillos, letras que saltan y cortina de salida; titulares que suben palabra por palabra; stickers que rebotan en el hero; franjas de tablero que se deslizan; tarjetas que aparecen en cascada; el producto vuela hacia el pedido al añadirlo. Todo respeta la opción "reducir movimiento" del teléfono.
-- **Intro con guiño:** dura unos 5 segundos. El cerdito se agacha, guiña con párpado y trazo dibujados en SVG (ver `intro__wink-fx` en `index.html`), salen chispas y las letras de COCHI saltan. El tiempo total se cambia en `setupIntro` de `app.js` (valor 4900). La intro se ve una vez por sesión: para repetirla, abre el sitio en una pestaña nueva o privada.
+- **Intro con guiño:** dura unos 5 segundos. El cerdito se agacha, guiña con párpado y trazo dibujados en SVG (ver `intro__wink-fx` en `index.html`), salen chispas y las letras de COCHI saltan. El tiempo total se cambia en `setupIntro` de `app.js` (valor 4900). Desde la versión 2 la intro se ve una vez por semana en cada teléfono (valor `INTRO_EVERY_MS` al inicio de `app.js`) y nunca al abrir el enlace de un plato compartido: para repetirla, abre el sitio en una ventana privada.
 - **Sello de actitud:** isotipo centrado en un círculo con el texto "Cochi desde el primer bocado" girando alrededor.
 - **Ofertas al pedir, flyers y panel admin:** ver la sección "Panel de administración" más abajo.
 - **Sin emojis ni símbolos especiales:** los iconos ahora son dibujos SVG (definidos al inicio de `index.html`) y el mensaje de WhatsApp sale en texto limpio.

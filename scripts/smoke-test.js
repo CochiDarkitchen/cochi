@@ -152,6 +152,20 @@ async function waitForServer(url, child) {
     assert.equal((await (await confirmWith('CH-1107-9878', { deliveryFeeUSD: 0 })).json()).order.finalTotalUSD, 16, 'Delivery gratis ($0) es válido.');
     assert.equal((await (await confirmWith('CH-1107-9878', { deliveryFeeUSD: '2.346' })).json()).order.finalTotalUSD, 18.35, 'El monto se redondea a centavos igual que en la vista previa.');
     ok('Pedidos: historial completo, datos de opciones, confirmación del delivery, total final y revocación de consentimiento validados.');
+    // Versión 2: seguimiento de la comanda (en preparación, en camino, entregada, cancelada).
+    assert.equal((await sendOrder({ ...plainOrder, orderId: 'CH-1107-9879', mode: 'delivery' })).status, 200);
+    assert.equal((await confirmWith('CH-1107-9879', { status: 'preparing' })).status, 400, 'No se prepara una comanda sin total confirmado.');
+    assert.equal((await confirmWith('CH-1107-9879', { status: 'volando' })).status, 400, 'Un estado desconocido se rechaza.');
+    await confirmWith('CH-1107-9879', { deliveryFeeUSD: 2 });
+    for (const status of ['preparing', 'ready', 'delivered']) {
+      const step = await (await confirmWith('CH-1107-9879', { status })).json();
+      assert.equal(step.order.status, status, `La comanda debe pasar a ${status}.`);
+      assert.equal(step.order.finalTotalUSD, 18, 'Cambiar el estado no altera el total confirmado.');
+    }
+    const cancelled = await (await confirmWith('CH-1107-9878', { status: 'cancelled', reason: 'Prueba' })).json();
+    assert.equal(cancelled.order.status, 'cancelled'); assert.equal(cancelled.order.cancelReason, 'Prueba');
+    assert.equal((await (await confirmWith('CH-1107-9878', { status: 'confirmed' })).json()).order.status, 'confirmed', 'Una comanda cancelada con total se puede reactivar.');
+    ok('Seguimiento de comandas: en preparación, en camino, entregada, cancelada y reactivada validados.');
     const apiFiles = listApiJavaScriptFiles(path.join(root, 'api'));
     assert.deepEqual(apiFiles.map(file => path.relative(root, file).split(path.sep).join('/')), ['api/handler.js'], 'En el plan Hobby debe existir una sola función API.');
     // Vercel NO convierte en función los archivos o carpetas de api/ cuyo nombre empieza con "_" o ".".

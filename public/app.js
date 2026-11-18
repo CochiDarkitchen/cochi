@@ -5,7 +5,17 @@
   const $ = (selector, root = document) => root.querySelector(selector);
   const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
   const CART_KEY = 'cochi-cart-v1';
-  const INTRO_KEY = 'cochi-intro-seen-v1';
+  const INTRO_KEY = 'cochi-intro-seen-v2';
+  const INTRO_EVERY_MS = 7 * 24 * 60 * 60 * 1000; // la intro completa se ve una vez por semana en cada teléfono
+  const CUSTOMER_KEY = 'cochi-customer-v1';
+  const LAST_ORDER_KEY = 'cochi-last-order-v1';
+  const store = {
+    get(key, fallback = null) { try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : fallback; } catch { return fallback; } },
+    set(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* sin almacenamiento */ } },
+    remove(key) { try { localStorage.removeItem(key); } catch { /* sin almacenamiento */ } }
+  };
+  const normalizeText = value => String(value || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLocaleLowerCase('es');
+  const slugOf = value => normalizeText(value).replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'otros';
   const defaultConfig = {
     whatsappNumber: '584242246392',
     orderModes: ['delivery', 'pickup'],
@@ -121,9 +131,45 @@
     const join = a => (a.length > 1 ? `${a.slice(0, -1).join(', ')} y ${a[a.length - 1]}` : a[0]);
     return groups.map(g => `de ${join(g.days)}${g.from === '00:00' && g.to === '23:59' ? '' : `, de ${fmtHour(g.from)} a ${fmtHour(g.to)}`}`).join('; ');
   }
+  // Evita el doble punto cuando el horario termina en "p. m." o "a. m.".
+  const sentence = text => (/[.!?]$/.test(String(text).trim()) ? String(text).trim() : `${String(text).trim()}.`);
+  // Estado en vivo: "Abierto ahora · hasta las 10:00 p. m." o "Cerrado · abrimos el viernes a las 12:30 p. m."
+  function caracasNow(date = new Date()) {
+    const p = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: 'America/Caracas', weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(date).map(x => [x.type, x.value]));
+    return { day: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(p.weekday), minutes: Number(p.hour) * 60 + Number(p.minute) };
+  }
+  const toMinutes = hhmm => { const [h, m] = String(hhmm || '00:00').split(':').map(Number); return h * 60 + m; };
+  function liveStatus() {
+    if (config.ordersPaused) return { open: false, title: 'Pedidos en pausa', detail: 'Vuelve pronto' };
+    const list = scheduleList();
+    if (!list.some(d => d.open)) return { open: false, title: 'Cerrado', detail: 'Pronto anunciaremos el horario' };
+    const now = caracasNow();
+    if (isOrderDay()) {
+      const today = list.find(d => d.day === now.day), prev = list.find(d => d.day === (now.day + 6) % 7);
+      const inPrevOvernight = prev && prev.open && toMinutes(endOf(prev)) <= toMinutes(prev.from) && now.minutes < toMinutes(endOf(prev));
+      const closing = inPrevOvernight ? prev.to : today?.to;
+      if (!closing || closing === '23:59') return { open: true, title: 'Abierto ahora', detail: 'Recibimos pedidos todo el día' };
+      return { open: true, title: 'Abierto ahora', detail: `Pedidos hasta las ${fmtHour(closing)}` };
+    }
+    for (let offset = 0; offset < 8; offset++) {
+      const day = (now.day + offset) % 7, entry = list.find(d => d.day === day);
+      if (!entry || !entry.open) continue;
+      if (offset === 0 && toMinutes(entry.from) <= now.minutes) continue;
+      const when = offset === 0 ? 'hoy' : offset === 1 ? 'mañana' : `el ${DAY_NAMES[day]}`;
+      return { open: false, title: 'Cerrado ahora', detail: entry.from === '00:00' ? `Abrimos ${when}` : `Abrimos ${when} a las ${fmtHour(entry.from)}` };
+    }
+    return { open: false, title: 'Cerrado ahora', detail: 'Vuelve pronto' };
+  }
+  function renderLiveStatus() {
+    const state = liveStatus();
+    $$('[data-live-status]').forEach(el => {
+      el.classList.toggle('is-open', state.open); el.classList.toggle('is-closed', !state.open); el.hidden = false;
+      el.innerHTML = `<i aria-hidden="true"></i><strong>${escapeHtml(state.title)}</strong><span>${escapeHtml(state.detail)}</span>`;
+    });
+  }
   function orderScheduleMessage() {
     if (config.ordersPaused) return 'Cochi pausó los pedidos por ahora. Puedes explorar el menú y volver pronto.';
-    return `Cochi recibe pedidos ${scheduleSummary()}. Puedes explorar el menú y preparar tu selección; vuelve en ese horario para enviarla por WhatsApp.`;
+    return `${sentence(`Cochi recibe pedidos ${scheduleSummary()}`)} Puedes explorar el menú y preparar tu selección; vuelve en ese horario para enviarla por WhatsApp.`;
   }
   function updateScheduleNotice() {
     const note = $('#orderScheduleNote');
@@ -132,7 +178,8 @@
       note.textContent = orderScheduleMessage();
       note.classList.toggle('is-closed', !isOrderDay());
     }
-    $$('[data-schedule]').forEach(el => { el.textContent = el.dataset.schedule === 'work' ? `Trabajamos ${scheduleSummary()}.` : `Pedidos ${scheduleSummary()}.`; });
+    $$('[data-schedule]').forEach(el => { el.textContent = sentence(el.dataset.schedule === 'work' ? `Trabajamos ${scheduleSummary()}` : `Pedidos ${scheduleSummary()}`); });
+    renderLiveStatus();
     const button = $('#startCheckout');
     if (button) {
       const needsReview = cart.some(line => line.needsReview || !productAvailability(productFromCatalog(line.slug) || {}).canOrder);
@@ -235,8 +282,8 @@
   function productPriceMarkup(product, includeUSD = true) {
     const ves = getConvertedPrice(product.price_usd);
     let html = `<div class="product-price"><strong>${currencyUSD(product.price_usd)}</strong>`;
-    if (ves !== null) html += `<small class="price-ves${rateIsStale(rate) ? ' price-stale' : ''}">${currencyVES(ves)}${rateIsStale(rate) ? ' · tasa anterior' : ''}</small>`;
-    else html += '<small>Sin conversión Bs.</small>';
+    // El aviso de tasa por verificar se muestra una sola vez arriba del menú, no en cada plato.
+    if (ves !== null) html += `<small class="price-ves">${currencyVES(ves)}</small>`;
     html += '</div>';
     return html;
   }
@@ -271,31 +318,111 @@
     if (activeCategory !== 'Todo' && !cats.includes(activeCategory)) activeCategory = 'Todo';
     const buttons = [{ name: 'Todo', count: allProducts.length }, ...cats.map(name => ({ name, count: allProducts.filter(p => p.category === name).length }))];
     const prevLeft = target.scrollLeft;
-    target.innerHTML = buttons.map(item => `<button type="button" class="category-chip${activeCategory === item.name ? ' is-active' : ''}" aria-pressed="${activeCategory === item.name}" data-category="${escapeHtml(item.name)}" aria-pressed="${activeCategory === item.name ? 'true' : 'false'}">${escapeHtml(item.name)} <span class="category-chip__count">${item.count}</span></button>`).join('');
+    target.innerHTML = buttons.map(item => `<button type="button" class="category-chip${activeCategory === item.name ? ' is-active' : ''}" data-category="${escapeHtml(item.name)}" aria-pressed="${activeCategory === item.name ? 'true' : 'false'}">${escapeHtml(item.name)} <span class="category-chip__count">${item.count}</span></button>`).join('');
     target.scrollLeft = prevLeft;
-    const chip = $('.is-active', target);
-    if (chip) target.scrollTo({ left: Math.max(0, chip.offsetLeft - (target.clientWidth - chip.offsetWidth) / 2), behavior: reducedMotion ? 'auto' : 'smooth' });
+  }
+  // Marca la categoría visible sin volver a dibujar el menú (barra fija + seguimiento del scroll).
+  function setActiveChip(name) {
+    activeCategory = name;
+    const list = $('#categoryList'); if (!list) return;
+    $$('.category-chip', list).forEach(chip => { const on = chip.dataset.category === name; chip.classList.toggle('is-active', on); chip.setAttribute('aria-pressed', String(on)); });
+    const chip = $('.category-chip.is-active', list);
+    if (chip) list.scrollTo({ left: Math.max(0, chip.offsetLeft - (list.clientWidth - chip.offsetWidth) / 2), behavior: reducedMotion ? 'auto' : 'smooth' });
+  }
+  let spyPausedUntil = 0;
+  const stickyOffset = () => ($('#top')?.offsetHeight || 70) + ($('.menu-controls')?.offsetHeight || 0) + 10;
+  function goToCategory(name) {
+    if (activeSearch) { activeSearch = ''; const input = $('#menuSearch'); if (input) input.value = ''; renderProducts(); }
+    const target = name === 'Todo' ? $('#menu') : document.getElementById(`cat-${slugOf(name)}`);
+    setActiveChip(name);
+    if (!target) return;
+    spyPausedUntil = Date.now() + 1100;
+    const top = name === 'Todo' ? target.getBoundingClientRect().top + window.scrollY - ($('#top')?.offsetHeight || 70) : target.getBoundingClientRect().top + window.scrollY - stickyOffset();
+    window.scrollTo({ top: Math.max(0, top), behavior: reducedMotion ? 'auto' : 'smooth' });
+  }
+  function spyCategory() {
+    if (Date.now() < spyPausedUntil || activeSearch) return;
+    const groups = $$('.menu-group'); if (!groups.length) return;
+    const line = stickyOffset() + 30;
+    let current = 'Todo';
+    groups.forEach(group => { if (group.getBoundingClientRect().top <= line) current = group.dataset.menuGroup; });
+    if (current !== activeCategory) setActiveChip(current);
+  }
+  // Un toque y listo: los platos sin opciones (ni promo asociada) se añaden directo desde el menú.
+  const quickAddable = product => Boolean(product) && !(product.options || []).length && !ruleForProduct(product);
+  const plainKey = slug => lineKey(slug, [], '');
+  const cardQuantity = slug => cart.filter(line => line.slug === slug && !line.promo && !line.selections.length && !line.note).reduce((sum, line) => sum + line.quantity, 0);
+  function cardActionMarkup(product) {
+    if (product.is_coming_soon) return '';
+    const state = productAvailability(product), name = escapeHtml(product.name), slug = escapeHtml(product.slug);
+    if (!state.canOrder) return `<button type="button" class="product-card__add" disabled aria-label="${escapeHtml(state.reason)}">${state.type === 'day' ? 'No disponible hoy' : 'Agotado'}</button>`;
+    const quick = quickAddable(product), qty = quick ? cardQuantity(product.slug) : 0;
+    if (qty > 0) return `<div class="card-stepper" role="group" aria-label="Cantidad de ${name} en tu pedido"><button type="button" data-card-qty="-1" data-slug="${slug}" aria-label="Quitar un ${name}">−</button><output aria-live="polite">${qty}</output><button type="button" data-card-qty="1" data-slug="${slug}" aria-label="Añadir otro ${name}">+</button></div>`;
+    return quick
+      ? `<button type="button" class="product-card__add" data-quick-add="${slug}" aria-label="Añadir ${name} al pedido">Añadir <span aria-hidden="true">+</span></button>`
+      : `<button type="button" class="product-card__add" data-product-slug="${slug}" aria-label="Elegir opciones de ${name}">Elegir <span aria-hidden="true">+</span></button>`;
+  }
+  function refreshCardActions() {
+    const active = document.activeElement;
+    const focusKey = active?.dataset?.cardQty ? `[data-card-qty="${active.dataset.cardQty}"][data-slug="${CSS.escape(active.dataset.slug)}"]` : active?.dataset?.quickAdd ? `[data-card-qty="1"][data-slug="${CSS.escape(active.dataset.quickAdd)}"]` : '';
+    $$('[data-card-action]').forEach(box => { const product = productFromCatalog(box.dataset.cardAction); if (product) box.innerHTML = cardActionMarkup(product); });
+    $$('[data-product-card]').forEach(card => card.classList.toggle('is-in-cart', cart.some(line => line.slug === card.dataset.productCard)));
+    if (focusKey && active && !document.contains(active)) { const next = $(focusKey) || $(`[data-quick-add="${CSS.escape(active.dataset.slug || active.dataset.quickAdd || '')}"]`); next?.focus({ preventScroll: true }); }
+  }
+  function badgesMarkup(product, state) {
+    const status = state.label ? `<span class="product-badge ${state.type === 'out' ? 'product-badge--out' : state.type === 'soon' ? 'product-badge--soon' : 'product-badge--sunday'}">${escapeHtml(state.label)}</span>` : '';
+    return `<div class="product-card__badges">${tagBadge(product)}${product.featured ? '<span class="product-badge">FAVORITO</span>' : '<span></span>'}${status}</div>`;
   }
   function renderProductCard(product) {
     const state = productAvailability(product);
-    const hasPhoto = Boolean(safeAssetPath(product.image));
-    const visual = hasPhoto ? `<div class="product-card__visual"><img src="${escapeHtml(safeAssetPath(product.image))}" alt="${escapeHtml(`Fotografía promocional de ${product.name}`)}" loading="lazy" decoding="async" width="600" height="420"><div class="product-card__badges">${tagBadge(product)}${product.featured ? '<span class="product-badge">FAVORITO</span>' : '<span></span>'}${state.label ? `<span class="product-badge ${state.type === 'out' ? 'product-badge--out' : state.type === 'soon' ? 'product-badge--soon' : 'product-badge--sunday'}">${escapeHtml(state.label)}</span>` : ''}</div></div>` : `<div class="product-card__visual">${defaultGraphic(product)}<div class="product-card__badges">${tagBadge(product)}${product.featured ? '<span class="product-badge">FAVORITO</span>' : '<span></span>'}${state.label ? `<span class="product-badge ${state.type === 'out' ? 'product-badge--out' : state.type === 'soon' ? 'product-badge--soon' : 'product-badge--sunday'}">${escapeHtml(state.label)}</span>` : ''}</div></div>`;
+    const photo = safeAssetPath(product.image);
+    const visual = `<div class="product-card__visual${photo ? '' : ' product-card__visual--empty'}">${photo ? `<img src="${escapeHtml(photo)}" alt="${escapeHtml(`Fotografía promocional de ${product.name}`)}" loading="lazy" decoding="async" width="600" height="420">` : defaultGraphic(product)}${badgesMarkup(product, state)}</div>`;
     const coming = product.is_coming_soon;
-    return `<article class="product-card${product.brand === 'dulce' ? ' product-card--dulce' : ''}${!state.canOrder && !coming ? ' product-card--unavailable' : ''}" data-product-card="${escapeHtml(product.slug)}">
-      ${visual}<div class="product-card__content"><p class="product-card__category">${escapeHtml(product.category)}</p><h3 class="product-card__title">${escapeHtml(product.name)}</h3><p class="product-card__desc">${escapeHtml(product.description)}</p><div class="product-card__bottom">${coming ? '<div class="product-price"><strong>Muy pronto</strong><small>Estamos preparando algo</small></div>' : productPriceMarkup(product)}<button type="button" class="product-card__add" data-product-slug="${escapeHtml(product.slug)}" ${state.canOrder ? '' : 'disabled'} aria-label="${state.canOrder ? 'Elegir ' + escapeHtml(product.name) : escapeHtml(state.reason)}">${state.canOrder ? 'Elegir' : state.type === 'day' ? 'No disponible' : state.type === 'soon' ? 'Próximamente' : 'Agotado'} ${state.canOrder ? '<span aria-hidden="true">+</span>' : ''}</button></div></div></article>`;
+    return `<article class="product-card${product.brand === 'dulce' ? ' product-card--dulce' : ''}${!state.canOrder && !coming ? ' product-card--unavailable' : ''}${photo ? ' has-photo' : ''}" data-product-card="${escapeHtml(product.slug)}">
+      ${visual}<div class="product-card__content"><p class="product-card__category">${escapeHtml(product.category)}</p><h3 class="product-card__title"><button type="button" class="product-card__open" data-product-slug="${escapeHtml(product.slug)}" ${state.canOrder ? '' : 'aria-disabled="true"'}>${escapeHtml(product.name)}</button></h3><p class="product-card__desc">${escapeHtml(product.description)}</p><div class="product-card__bottom">${coming ? '<div class="product-price"><strong>Muy pronto</strong><small>Estamos preparando algo</small></div>' : productPriceMarkup(product)}<div class="product-card__action" data-card-action="${escapeHtml(product.slug)}">${cardActionMarkup(product)}</div></div></div></article>`;
+  }
+  function renderRepeat() {
+    const last = store.get(LAST_ORDER_KEY);
+    const lines = Array.isArray(last?.lines) ? last.lines.filter(line => productFromCatalog(line.slug)) : [];
+    const html = !lines.length || cart.length ? '' : (() => {
+      const names = lines.slice(0, 3).map(line => `${line.quantity}× ${productFromCatalog(line.slug).name}`).join(', ') + (lines.length > 3 ? '…' : '');
+      const when = last.at ? new Intl.DateTimeFormat('es-VE', { day: 'numeric', month: 'long', timeZone: 'America/Caracas' }).format(new Date(last.at)) : '';
+      return `<div class="repeat-card"><span class="repeat-card__icon" aria-hidden="true"><img src="/assets/brand/cochi-isotipo-cream.png" alt="" width="34" height="36"></span><div class="repeat-card__copy"><strong>¿Lo de siempre?</strong><span>Tu último pedido${when ? ` (${escapeHtml(when)})` : ''}: ${escapeHtml(names)}</span></div><button type="button" class="button button--cream repeat-card__btn" data-repeat-order>Repetir pedido</button></div>`;
+    })();
+    $$('[data-repeat-slot]').forEach(slot => { slot.innerHTML = html; slot.hidden = !html; });
+  }
+  function repeatLastOrder() {
+    const last = store.get(LAST_ORDER_KEY);
+    const lines = hydrateCart(last?.lines || []);
+    const usable = lines.filter(line => !line.needsReview && productAvailability(productFromCatalog(line.slug) || {}).canOrder);
+    if (!usable.length) { showToast('Los productos de tu último pedido no están disponibles hoy.', false); return; }
+    usable.forEach(line => { const same = cart.find(item => item.key === line.key); if (same) same.quantity = Math.min(99, same.quantity + line.quantity); else cart.push(line); });
+    saveCart(); renderCart(); haptic(); openCart();
+    const skipped = lines.length - usable.length;
+    showToast(skipped ? `Listo. ${skipped} producto(s) no están disponibles hoy y no se añadieron.` : 'Tu pedido de siempre ya está en el carrito.', !skipped);
   }
   function renderProducts() {
     const target = $('#productGrid');
     if (!target) return;
     renderCategories();
-    let list = getMenuProducts();
-    if (activeCategory !== 'Todo') list = list.filter(p => p.category === activeCategory);
+    const all = getMenuProducts();
+    $('#menuStatus').textContent = rate ? (rateIsStale(rate) ? `${rateLabel()} Los montos en Bs. son una referencia.` : rateLabel()) : 'Los precios base están en USD. La conversión a bolívares no está disponible temporalmente.';
+    $('#menuStatus').classList.toggle('is-warning', Boolean(rate && rateIsStale(rate)));
+    const empty = `<div class="empty-filter"><strong>No encontramos ese antojo.</strong><p>Prueba con otra palabra o vuelve a ver todas las categorías.</p><button type="button" class="button button--cream" data-category="Todo">Ver todo el menú</button></div>`;
     if (activeSearch) {
-      const q = activeSearch.toLocaleLowerCase('es');
-      list = list.filter(p => `${p.name} ${p.description} ${p.category}`.toLocaleLowerCase('es').includes(q));
+      const q = normalizeText(activeSearch);
+      const list = all.filter(p => normalizeText(`${p.name} ${p.description} ${p.category} ${p.tag}`).includes(q));
+      target.classList.remove('is-grouped');
+      target.innerHTML = list.length ? `<p class="menu-results" role="status">${list.length} ${list.length === 1 ? 'resultado' : 'resultados'} para “${escapeHtml(activeSearch)}”</p><div class="product-grid">${list.map(renderProductCard).join('')}</div>` : empty;
+    } else {
+      const cats = [...new Set(all.map(p => p.category))];
+      target.classList.add('is-grouped');
+      target.innerHTML = all.length ? cats.map(cat => {
+        const items = all.filter(p => p.category === cat), id = `cat-${slugOf(cat)}`;
+        return `<section class="menu-group" id="${id}" data-menu-group="${escapeHtml(cat)}" aria-labelledby="${id}-title"><header class="menu-group__head"><h3 id="${id}-title">${escapeHtml(cat)}</h3><span>${items.length} ${items.length === 1 ? 'opción' : 'opciones'}</span></header><div class="product-grid">${items.map(renderProductCard).join('')}</div></section>`;
+      }).join('') : empty;
     }
-    $('#menuStatus').textContent = rate ? `${rateIsStale(rate) ? 'AVISO · ' : ''}${rateLabel()}` : 'Los precios base están en USD. La conversión a bolívares no está disponible temporalmente.';
-    target.innerHTML = list.length ? list.map(renderProductCard).join('') : `<div class="empty-filter"><strong>No encontramos ese antojo.</strong><p>Prueba con otra palabra o vuelve a ver todas las categorías.</p><button type="button" class="button button--cream" data-category="Todo">Ver todo el menú</button></div>`;
+    refreshCardActions();
     prepReveal($$('.product-card', target));
   }
   function renderDulceFeatured() {
@@ -413,7 +540,7 @@
     const mobileTotal = $('#mobileOrderBar [data-mobile-total]');
     if (mobileTotal) mobileTotal.textContent = currencyUSD(cartProductTotal());
     const empty = cart.length === 0;
-    renderCartUpsells();
+    renderCartUpsells(); renderCartSuggestions(); refreshCardActions(); renderRepeat();
     $('#cartEmpty').hidden = !empty;
     $('#cartLines').hidden = empty;
     $('#cartBottom').hidden = empty;
@@ -447,7 +574,8 @@
     $('#startCheckout').title = invalid ? 'Revisa las opciones o disponibilidad de los productos.' : '';
     if ($('#checkoutView').hidden === false) renderCheckoutSummary();
   }
-  function addProductToCart(product, selections, note, quantity, promoRuleToAdd = null) {
+  function haptic() { try { navigator.vibrate?.(12); } catch { /* sin vibración */ } }
+  function addProductToCart(product, selections, note, quantity, promoRuleToAdd = null, fromRect = null) {
     const state = productAvailability(product);
     if (!state.canOrder) { showToast(state.reason || 'Este producto no está disponible.', false); return; }
     const normalized = getSelectedCurrentOptions(product, selections);
@@ -456,10 +584,36 @@
     line.key = lineKey(line.slug, line.selections, line.note);
     const existing = cart.find(item => item.key === line.key);
     if (existing) existing.quantity = Math.min(99, existing.quantity + line.quantity); else cart.push(line);
-    const fromRect = $('#saveProductToCart')?.getBoundingClientRect();
+    const from = fromRect || $('#saveProductToCart')?.getBoundingClientRect();
     if (promoRuleToAdd) addPromoUnits(promoRuleToAdd, line.quantity);
-    saveCart(); renderCart(); closeProductDialog(); flyToCart(fromRect);
+    saveCart(); renderCart(); haptic();
+    if ($('#productDialog').open) closeProductDialog();
+    if (!$('#cartDrawer').classList.contains('is-open')) flyToCart(from);
     showToast(promoRuleToAdd ? `${product.name} y ${productFromCatalog(promoRuleToAdd.add_slug)?.name || 'tu promo'} añadidos al pedido.` : `${product.name} añadido al pedido.`);
+  }
+  function quickAdd(slug, sourceEl) {
+    const product = productFromCatalog(slug);
+    if (!product) return;
+    if (!quickAddable(product)) { openProductDialog(slug); return; }
+    addProductToCart(product, [], '', 1, null, sourceEl?.getBoundingClientRect());
+  }
+  function changeCardQuantity(slug, delta) {
+    const key = plainKey(slug);
+    if (delta > 0 && !cart.some(line => line.key === key)) { quickAdd(slug); return; }
+    changeCartQuantity(key, delta);
+    if (delta > 0) haptic();
+  }
+  // "Completa tu pedido": bebidas, adicionales y postres que se suman con un toque desde el carrito.
+  function renderCartSuggestions() {
+    const box = $('#cartSuggest'); if (!box) return;
+    const fits = p => p.is_visible && !p.is_coming_soon && quickAddable(p) && productAvailability(p).canOrder && !cart.some(line => line.slug === p.slug)
+      && (p.brand === 'dulce' || /bebida|adicional|extra|acompa|contorno|postre|dulce|refresco/.test(normalizeText(p.category)));
+    const items = cart.length ? products.filter(fits).sort((a, b) => a.price_usd - b.price_usd).slice(0, 8) : [];
+    box.hidden = !items.length;
+    box.innerHTML = items.length ? `<p class="cart-suggest__title">Completa tu pedido</p><div class="cart-suggest__row">${items.map(p => `<button type="button" class="suggest-chip" data-quick-add="${escapeHtml(p.slug)}" aria-label="Añadir ${escapeHtml(p.name)} por ${currencyUSD(p.price_usd)}"><span class="suggest-chip__img">${upsellThumb(p)}</span><span class="suggest-chip__name">${escapeHtml(p.name)}</span><span class="suggest-chip__price">${currencyUSD(p.price_usd)}</span><span class="suggest-chip__plus" aria-hidden="true">+</span></button>`).join('')}</div>` : '';
+  }
+  function clearCart() {
+    cart = []; coupon = null; saveCart(); renderCart();
   }
   function changeCartQuantity(key, delta) {
     const line = cart.find(item => item.key === key);
@@ -514,25 +668,53 @@
     const upsellBlock = rule && upProduct && productAvailability(upProduct).canOrder
       ? `<label class="upsell-card"><input type="checkbox" id="upsellCheck" data-upsell-rule="${escapeHtml(rule.id)}"><span class="upsell-card__img">${upsellThumb(upProduct)}</span><span class="upsell-card__copy"><strong>${escapeHtml(rule.title)}</strong><small>${escapeHtml(upProduct.name)} por ${currencyUSD(promoPrice(rule))}${promoSaving(rule) > 0 ? ` <s>${currencyUSD(upProduct.price_usd)}</s>` : ''}</small></span>${promoSaving(rule) > 0 ? `<span class="upsell-card__save">Ahorras ${currencyUSD(promoSaving(rule))}</span>` : ''}<span class="upsell-card__tick"><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg></span></label>` : '';
     const ves = getConvertedPrice(product.price_usd);
-    $('#productDialogContent').innerHTML = `<div class="product-dialog-content">${visual}<div class="product-dialog__copy"><p class="product-card__category">${escapeHtml(product.category)}${product.tag ? `<span class="dialog-tag">${escapeHtml(product.tag)}</span>` : ''}</p><h2 id="productDialogTitle">${escapeHtml(product.name)}</h2><p>${escapeHtml(product.description)}</p><div class="product-dialog__price"><strong>${currencyUSD(product.price_usd)}</strong><small>${ves === null ? 'Conversión a Bs. no disponible' : currencyVES(ves) + (rateIsStale(rate) ? ' · tasa anterior' : '')}</small></div><div id="productDialogOptionGroups">${groupsHtml}</div>${upsellBlock}<label class="product-dialog__note"><span>Observaciones de este producto <small>(opcional)</small></span><textarea id="productNote" maxlength="400" rows="3" placeholder="Ej. detalles para preparar este producto">${escapeHtml(line?.note || '')}</textarea></label><p class="product-dialog__error" id="productDialogError" hidden></p><div class="product-dialog__foot"><div class="product-dialog__quantity"><button type="button" id="modalQtyMinus" aria-label="Disminuir cantidad">−</button><output id="modalQtyValue">${modalQuantity}</output><button type="button" id="modalQtyPlus" aria-label="Aumentar cantidad">+</button></div><button type="button" class="button button--red" id="saveProductToCart">${editKey ? 'Guardar cambios' : 'Añadir al pedido'} <svg class="ico" aria-hidden="true"><use href="#i-arrow"/></svg></button></div></div></div>`;
+    $('#productDialogContent').innerHTML = `<div class="product-dialog-content">${visual}<div class="product-dialog__copy"><p class="product-card__category">${escapeHtml(product.category)}${product.tag ? `<span class="dialog-tag">${escapeHtml(product.tag)}</span>` : ''}</p><h2 id="productDialogTitle">${escapeHtml(product.name)}</h2><p>${escapeHtml(product.description)}</p><button type="button" class="share-link" data-share-product="${escapeHtml(product.slug)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/></svg> Compartir este plato</button><div class="product-dialog__price"><strong>${currencyUSD(product.price_usd)}</strong>${ves === null ? '' : `<small>${currencyVES(ves)}</small>`}</div><div id="productDialogOptionGroups">${groupsHtml}</div>${upsellBlock}<label class="product-dialog__note"><span>Observaciones de este producto <small>(opcional)</small></span><textarea id="productNote" maxlength="400" rows="3" placeholder="Ej. detalles para preparar este producto">${escapeHtml(line?.note || '')}</textarea></label><p class="product-dialog__error" id="productDialogError" hidden></p><div class="product-dialog__foot"><div class="product-dialog__quantity"><button type="button" id="modalQtyMinus" aria-label="Disminuir cantidad">−</button><output id="modalQtyValue">${modalQuantity}</output><button type="button" id="modalQtyPlus" aria-label="Aumentar cantidad">+</button></div><button type="button" class="button button--red" id="saveProductToCart">${editKey ? 'Guardar cambios' : 'Añadir al pedido'} <svg class="ico" aria-hidden="true"><use href="#i-arrow"/></svg></button></div></div></div>`;
     const dialog = $('#productDialog');
     if (!dialog.open) dialog.showModal();
-    $('#modalQtyMinus').addEventListener('click', () => { modalQuantity = Math.max(1, modalQuantity - 1); $('#modalQtyValue').textContent = modalQuantity; });
-    $('#modalQtyPlus').addEventListener('click', () => { modalQuantity = Math.min(99, modalQuantity + 1); $('#modalQtyValue').textContent = modalQuantity; });
+    $('#modalQtyMinus').addEventListener('click', () => { modalQuantity = Math.max(1, modalQuantity - 1); $('#modalQtyValue').textContent = modalQuantity; updateDialogTotal(); });
+    $('#modalQtyPlus').addEventListener('click', () => { modalQuantity = Math.min(99, modalQuantity + 1); $('#modalQtyValue').textContent = modalQuantity; updateDialogTotal(); });
     $('#saveProductToCart').addEventListener('click', saveModalProduct);
-    $('#productDialogContent').addEventListener('click', optionQuantityClick);
-    $('#productDialogContent').addEventListener('change', optionInputChange);
+    updateDialogTotal();
     lockScroll();
+  }
+  // El botón principal de la ficha muestra lo que costará la línea: "Añadir · $18.00".
+  function updateDialogTotal() {
+    const button = $('#saveProductToCart'); if (!button || !modalProduct) return;
+    const { selections } = selectionsFromModal();
+    let total = (Number(modalProduct.price_usd || 0) + selections.reduce((sum, s) => sum + Number(s.price_usd || 0) * Number(s.quantity || 1), 0)) * modalQuantity;
+    const upsell = $('#upsellCheck');
+    if (upsell?.checked) { const rule = upsellRule(upsell.dataset.upsellRule); if (rule) total += promoPrice(rule) * modalQuantity; }
+    button.innerHTML = `${editingCartKey ? 'Guardar' : 'Añadir'} · ${currencyUSD(total)} <svg class="ico" aria-hidden="true"><use href="#i-arrow"/></svg>`;
+  }
+  async function shareProduct(slug) {
+    const product = productFromCatalog(slug); if (!product) return;
+    const url = `${location.origin}/#producto=${encodeURIComponent(product.slug)}`;
+    const text = `Mira esto en Cochi: ${product.name} (${currencyUSD(product.price_usd)})`;
+    if (navigator.share) { try { await navigator.share({ title: `${product.name} · Cochi`, text, url }); } catch { /* el cliente canceló */ } return; }
+    try { await navigator.clipboard.writeText(`${text} ${url}`); showToast('Enlace copiado. Pégalo en WhatsApp o en tus redes.'); }
+    catch { showToast(url); }
+  }
+  function openDeepLink() {
+    const match = /^#producto=([\w-]+)/.exec(location.hash || '');
+    if (!match) return;
+    const product = productFromCatalog(decodeURIComponent(match[1]));
+    history.replaceState(null, '', location.pathname + location.search);
+    if (!product) return;
+    const card = $(`[data-product-card="${CSS.escape(product.slug)}"]`);
+    card?.scrollIntoView({ block: 'center' });
+    if (productAvailability(product).canOrder) openProductDialog(product.slug);
+    else showToast(productAvailability(product).reason || 'Este producto no está disponible hoy.', false);
   }
   function optionInputChange(event) {
     const input = event.target;
     if (!(input instanceof HTMLInputElement)) return;
-    if (input.id === 'upsellCheck') { input.closest('.upsell-card')?.classList.toggle('is-on', input.checked); return; }
+    if (input.id === 'upsellCheck') { input.closest('.upsell-card')?.classList.toggle('is-on', input.checked); updateDialogTotal(); return; }
     if (input.dataset.optionMulti) {
       const key = `${input.dataset.optionGroup}:${input.dataset.optionChoice}`;
       const qty = $(`[data-option-qty-current="${CSS.escape(key)}"]`, $('#productDialogContent'));
       if (qty) qty.textContent = input.checked ? String(Math.max(1, Number(qty.textContent || 0))) : '0';
     }
+    updateDialogTotal();
   }
   function optionQuantityClick(event) {
     const button = event.target.closest('[data-option-qty-step]');
@@ -546,6 +728,7 @@
     let qty = Math.max(0, Math.min(99, Number(output.textContent || 0) + Number(button.dataset.optionQtyStep)));
     output.textContent = String(qty);
     checkbox.checked = qty > 0;
+    updateDialogTotal();
   }
   function selectionsFromModal() {
     const selections = [];
@@ -739,7 +922,7 @@
     rows.push(mode === 'delivery' ? 'El costo de entrega, el total final y el monto en Bs. te los confirma Cochi por este chat.' : 'El total final y el monto en Bs. te los confirma Cochi por este chat.');
     rows.push('', line, '*CONFIRMACIÓN Y PAGO*', 'El monto final, la disponibilidad y los datos de pago se confirman directamente por este chat.', 'La preparación del pedido comienza únicamente después de que Cochi reciba el depósito acordado.');
     if (orderNotes) rows.push('', '*NOTAS ADICIONALES*', orderNotes);
-    rows.push('', `Cochi recibe pedidos ${scheduleSummary()}.`, '¡Gracias por pedir en Cochi!');
+    rows.push('', sentence(`Cochi recibe pedidos ${scheduleSummary()}`), '¡Gracias por pedir en Cochi!');
     return rows.join('\n');
   }
   async function handleCheckoutSubmit(event) {
@@ -765,7 +948,7 @@
   }
   function showConfirm() {
     renderConfirm();
-    $('#checkoutView').hidden = true; $('#confirmView').hidden = false; $('#confirmFallback').hidden = true;
+    $('#checkoutView').hidden = true; $('#confirmView').hidden = false; $('#confirmFallback').hidden = true; $('#newOrderAfterSend').hidden = true;
     $('#cartDrawer').scrollTop = 0;
     $('#confirmTitle').focus({ preventScroll: true });
   }
@@ -783,8 +966,32 @@
     const pay = String(config.paymentInfo || '').trim();
     $('#confirmPay').hidden = !pay; $('#confirmPayText').textContent = pay;
   }
+  // Datos del cliente guardados solo en su propio teléfono (no salen de su navegador).
+  const CUSTOMER_FIELDS = ['customerName', 'customerPhone', 'customerEmail', 'address', 'sector', 'reference'];
+  function prefillCustomer() {
+    const saved = store.get(CUSTOMER_KEY), form = $('#checkoutForm'), note = $('#savedDataNote');
+    if (!saved || typeof saved !== 'object') { if (note) note.hidden = true; return; }
+    let filled = false;
+    CUSTOMER_FIELDS.forEach(name => { const input = $(`[name="${name}"]`, form); if (input && !input.value && saved[name]) { input.value = String(saved[name]).slice(0, Number(input.maxLength) > 0 ? input.maxLength : 220); filled = true; } });
+    const mode = $(`input[name="orderMode"][value="${CSS.escape(String(saved.orderMode || ''))}"]`, form);
+    if (mode) { mode.checked = true; updateDeliveryFields(); }
+    if (note) note.hidden = !filled && !mode;
+  }
+  function rememberCustomer(data) {
+    if (data.get('rememberMe') !== 'yes') { store.remove(CUSTOMER_KEY); return; }
+    store.set(CUSTOMER_KEY, Object.fromEntries([...CUSTOMER_FIELDS, 'orderMode'].map(name => [name, String(data.get(name) || '').trim()])));
+  }
+  function forgetCustomer() {
+    store.remove(CUSTOMER_KEY);
+    const form = $('#checkoutForm');
+    CUSTOMER_FIELDS.forEach(name => { const input = $(`[name="${name}"]`, form); if (input) input.value = ''; });
+    $('#savedDataNote').hidden = true;
+    showToast('Listo. Borramos tus datos de este teléfono.');
+  }
   async function sendPendingOrder() {
     if (!pendingOrder) return;
+    rememberCustomer(pendingOrder.data);
+    store.set(LAST_ORDER_KEY, { at: new Date().toISOString(), orderId: pendingOrder.orderId, lines: cart.filter(line => !line.promo).map(({ slug, quantity, selections, note }) => ({ slug, quantity, selections, note })) });
     if (coupon && !pendingOrder.redeemed) {
       const button = $('#confirmSend'); button.disabled = true;
       try { coupon = await couponCall('redeem', { orderId: pendingOrder.orderId, phone: String(pendingOrder.data.get('customerPhone') || '') }); pendingOrder.redeemed = true; }
@@ -826,7 +1033,7 @@
       if (!registration.ok) throw new Error(`El registro respondió ${registration.status}.`);
     } catch (error) { console.warn('No se pudo registrar el pedido en el panel:', error); }
     const url = `https://wa.me/${pendingOrder.number}?text=${encodeURIComponent(buildWhatsAppMessage(pendingOrder.data, pendingOrder.orderId))}`;
-    $('#confirmFallbackLink').href = url; $('#confirmFallback').hidden = false;
+    $('#confirmFallbackLink').href = url; $('#confirmFallback').hidden = false; $('#newOrderAfterSend').hidden = false;
     const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.matchMedia('(pointer: coarse)').matches;
     if (isMobile) { window.location.assign(url); return; }
     let opened = null;
@@ -1062,8 +1269,10 @@
     const intro = $('#intro');
     return new Promise(resolve => {
       const finish = () => { document.body.classList.add('is-ready'); resolve(); };
-      let seen = false;
-      try { seen = sessionStorage.getItem(INTRO_KEY) === '1'; } catch { /* storage blocked */ }
+      // Un cliente con hambre no debe esperar cada vez: la intro completa sale una vez por semana,
+      // y nunca cuando llega desde el enlace de un plato compartido.
+      let seen = /^#producto=/.test(location.hash || '');
+      try { seen = seen || Date.now() - Number(localStorage.getItem(INTRO_KEY) || 0) < INTRO_EVERY_MS; } catch { /* storage blocked */ }
       if (!intro || seen) { intro?.remove(); finish(); return; }
       document.documentElement.classList.add('is-intro'); setPageInert(true);
       let done = false;
@@ -1073,7 +1282,7 @@
         if (done) return; done = true;
         intro.classList.add('is-hidden');
         document.documentElement.classList.remove('is-intro'); setPageInert(false); document.removeEventListener('keydown', onKey);
-        try { sessionStorage.setItem(INTRO_KEY, '1'); } catch { /* no storage */ }
+        try { localStorage.setItem(INTRO_KEY, String(Date.now())); } catch { /* no storage */ }
         window.setTimeout(finish, reducedMotion ? 0 : 450);
         window.setTimeout(() => intro.remove(), reducedMotion ? 5 : 1000);
       };
@@ -1151,14 +1360,27 @@
       const max = document.documentElement.scrollHeight - window.innerHeight;
       document.documentElement.style.setProperty('--sp', max > 0 ? Math.min(1, window.scrollY / max).toFixed(4) : 0);
       $('#top')?.classList.toggle('is-scrolled', window.scrollY > 12);
+      document.documentElement.style.setProperty('--header-h', `${$('#top')?.offsetHeight || 70}px`);
+      spyCategory();
     };
+    window.addEventListener('resize', () => { if (!ticking) { ticking = true; requestAnimationFrame(update); } }, { passive: true });
     window.addEventListener('scroll', () => { if (!ticking) { ticking = true; requestAnimationFrame(update); } }, { passive: true });
     update();
   }
   function setupEvents() {
+    // Se registran una sola vez (antes se sumaban cada vez que se abría la ficha y las cantidades saltaban de a dos).
+    $('#productDialogContent').addEventListener('click', optionQuantityClick);
+    $('#productDialogContent').addEventListener('change', optionInputChange);
     document.addEventListener('click', event => {
       const openButton = event.target.closest('[data-open-cart]');
       if (openButton) { event.preventDefault(); closeMobileNav(); openCart(); return; }
+      const quickButton = event.target.closest('[data-quick-add]');
+      if (quickButton) { event.preventDefault(); quickAdd(quickButton.dataset.quickAdd, quickButton); return; }
+      const cardQty = event.target.closest('[data-card-qty]');
+      if (cardQty) { changeCardQuantity(cardQty.dataset.slug, Number(cardQty.dataset.cardQty)); return; }
+      const shareButton = event.target.closest('[data-share-product]');
+      if (shareButton) { shareProduct(shareButton.dataset.shareProduct); return; }
+      if (event.target.closest('[data-repeat-order]')) { repeatLastOrder(); return; }
       const productButton = event.target.closest('[data-product-slug],[data-add-product]');
       if (productButton && !productButton.disabled) {
         event.preventDefault();
@@ -1167,21 +1389,9 @@
         return;
       }
       const catButton = event.target.closest('[data-category]');
-      if (catButton) {
-        activeCategory = catButton.dataset.category || 'Todo';
-        renderProducts();
-        return;
-      }
+      if (catButton) { goToCategory(catButton.dataset.category || 'Todo'); return; }
       const filterButton = event.target.closest('[data-filter-category]');
-      if (filterButton) {
-        event.preventDefault();
-        activeCategory = filterButton.dataset.filterCategory || 'Todo';
-        activeSearch = '';
-        $('#menuSearch').value = '';
-        renderProducts();
-        $('#menu').scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth' });
-        return;
-      }
+      if (filterButton) { event.preventDefault(); goToCategory(filterButton.dataset.filterCategory || 'Todo'); return; }
       const qtyButton = event.target.closest('[data-line-qty]');
       if (qtyButton) { changeCartQuantity(qtyButton.dataset.lineKey, Number(qtyButton.dataset.lineQty)); return; }
       const removeButton = event.target.closest('[data-remove-line]');
@@ -1209,13 +1419,16 @@
         showToast('Edita los productos marcados y verifica su disponibilidad.', false); return;
       }
       $('#cartView').hidden = true; $('#checkoutView').hidden = false;
-      renderModes(); renderCheckoutSummary(); $('#checkoutError').hidden = true;
+      renderModes(); prefillCustomer(); renderCheckoutSummary(); $('#checkoutError').hidden = true;
       $('#checkoutView').scrollTop = 0;
       $('[name="customerName"]', $('#checkoutForm')).focus({ preventScroll:true });
     });
     $('#backToCart').addEventListener('click', () => { $('#checkoutView').hidden = true; $('#cartView').hidden = false; });
     $('#backToData').addEventListener('click', () => { $('#confirmView').hidden = true; $('#checkoutView').hidden = false; $('#cartDrawer').scrollTop = 0; $('#checkoutForm [name="customerName"]')?.focus({ preventScroll: true }); });
     $('#confirmSend').addEventListener('click', sendPendingOrder);
+    $('#forgetData').addEventListener('click', forgetCustomer);
+    $('#clearCart').addEventListener('click', () => { if (window.confirm('¿Vaciar tu pedido? Se quitarán todos los productos.')) { clearCart(); showToast('Tu pedido quedó vacío.'); } });
+    $('#newOrderAfterSend').addEventListener('click', () => { clearCart(); pendingOrder = null; closeCart(); showToast('¡Gracias por pedir en Cochi! Guardamos tu pedido para repetirlo cuando quieras.'); });
     $('#couponApply').addEventListener('click', applyCoupon);
     $('#couponCode').addEventListener('keydown', event => { if (event.key === 'Enter') { event.preventDefault(); applyCoupon(); } });
     $('#couponCode').addEventListener('input', () => { if (coupon && coupon.code !== $('#couponCode').value.trim().toUpperCase()) { coupon = null; $('#couponMsg').textContent = ''; renderCheckoutSummary(); } });
@@ -1270,9 +1483,11 @@
     renderFlyers(); renderTestimonials(); renderAnnouncements();
     $$('[data-price-of]').forEach(el => { const p = productFromCatalog(el.dataset.priceOf); if (p) el.textContent = currencyUSD(p.price_usd).replace('.00', ''); });
     updateScheduleNotice();
+    window.setInterval(updateScheduleNotice, 60 * 1000); // abre o cierra el botón de pedir justo a la hora
     await introDone;
     setupReveal();
     setupFab();
+    openDeepLink();
     registerServiceWorker();
     // Sincroniza el carrito entre pestañas del mismo navegador.
     window.addEventListener('storage', event => {
