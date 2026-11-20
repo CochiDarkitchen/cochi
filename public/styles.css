@@ -557,6 +557,84 @@ html[data-cochi-theme]:not([data-cochi-theme="original"]) .site-header::after{ba
 .share-link svg{width:16px;height:16px}
 #saveProductToCart{white-space:nowrap}
 
+/* =====================================================================
+   VERSIÓN 3 · Pulido de interfaz, micro-animaciones y experiencia UX
+   ===================================================================== */
+
+/* ---- Botón de saltar intro ---- */
+.intro__skip{position:absolute;z-index:10;right:clamp(18px,4vw,38px);bottom:clamp(46px,6vh,68px);display:inline-flex;align-items:center;gap:8px;min-height:42px;padding:0 18px;border:1.5px solid rgba(230,224,191,.45);border-radius:999px;background:rgba(0,0,0,.18);backdrop-filter:blur(8px);color:var(--cochi-cream);font-size:12.5px;font-weight:800;letter-spacing:.04em;cursor:pointer;transition:background .2s,border-color .2s,transform .2s;animation:introText .5s ease .8s both}
+.intro__skip:hover{background:var(--cochi-cream);color:var(--cochi-red);border-color:var(--cochi-cream);transform:translateY(-2px)}
+.intro__skip:active{transform:scale(.95)}
+
+/* ---- Buscador con botón limpiar y filtros rápidos ---- */
+.menu-search-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin:0 0 14px}
+.menu-search--top{position:relative;margin:0;flex:1 1 320px;max-width:460px}
+.menu-search__clear{flex:none;width:28px;height:28px;border:0;border-radius:50%;background:rgba(245,240,220,.16);color:var(--paper);font-size:18px;font-weight:700;line-height:1;display:grid;place-items:center;cursor:pointer;transition:background .18s,transform .18s}
+.menu-search__clear:hover{background:var(--cochi-red);color:#fff;transform:scale(1.08)}
+.menu-search__clear[hidden]{display:none!important}
+.quick-filters{display:flex;align-items:center;gap:8px;overflow-x:auto;max-width:100%;padding:2px 0;scrollbar-width:none}
+.quick-filters::-webkit-scrollbar{display:none}
+.qf-chip{flex:none;display:inline-flex;align-items:center;gap:6px;min-height:38px;padding:0 14px;border:1px solid rgba(230,224,191,.22);border-radius:999px;background:rgba(245,240,220,.06);color:#e5dec8;font-size:12px;font-weight:800;white-space:nowrap;cursor:pointer;transition:background .22s,border-color .22s,color .22s,transform .22s cubic-bezier(.2,1.5,.4,1)}
+.qf-chip:hover{background:rgba(245,240,220,.14);border-color:rgba(230,224,191,.45);color:#fff;transform:translateY(-1px)}
+.qf-chip.is-active{background:var(--cochi-cream);border-color:var(--cochi-cream);color:var(--ink);transform:scale(1.04);box-shadow:0 6px 18px rgba(0,0,0,.28)}
+.menu-results-bar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin:0 0 16px;padding:10px 14px;border-radius:14px;background:rgba(245,240,220,.07);border:1px solid rgba(245,240,220,.14)}
+.menu-results-bar .menu-results{margin:0}
+.menu-results__reset{border:0;background:rgba(235,20,12,.22);color:#fff;padding:6px 13px;border-radius:999px;font-size:12px;font-weight:800;cursor:pointer;transition:background .2s}
+.menu-results__reset:hover{background:var(--cochi-red)}
+
+/* ---- Barra sticky de categorías con efecto cristal ---- */
+.menu-controls{background:rgba(33,30,26,.92);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+
+/* ---- Tarjetas de producto: pills de promo, marca de agua y contador en botón ---- */
+.product-card__watermark{position:absolute;bottom:8px;left:10px;right:10px;font-size:10px;font-weight:900;letter-spacing:.18em;text-transform:uppercase;color:rgba(33,30,26,.34);text-align:center;pointer-events:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.product-card__graphic--red .product-card__watermark{color:rgba(230,224,191,.5)}
+.product-card__graphic--dulce .product-card__watermark{color:rgba(75,41,40,.42)}
+.product-card__pills{display:flex;flex-wrap:wrap;gap:5px;margin:-4px 0 10px}
+.product-card__pill{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:999px;background:rgba(33,30,26,.07);color:#544c3f;font-size:11px;font-weight:800;line-height:1.3}
+.product-card__pill--promo{background:rgba(235,20,12,.11);color:var(--red-ink,#bd0d07);border:1px dashed rgba(235,20,12,.35)}
+.product-card__add--in-cart{background:var(--ink);color:var(--paper);padding-left:8px}
+.product-card__qty-pill{display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 5px;border-radius:999px;background:var(--cochi-red);color:#fff;font-size:11.5px;font-weight:900}
+@media (max-width:760px){
+  .menu-groups .product-card__watermark{display:none}
+  .menu-groups .product-card__pills{margin:-2px 0 8px}
+  .menu-groups .product-card__pill{font-size:10.5px;padding:2px 8px}
+}
+
+/* ---- Ficha de producto: estado de opciones en vivo y sacudida al faltar obligatorio ---- */
+.option-group{transition:border-color .25s,background .25s,padding .25s;border-radius:12px}
+.option-group__status{padding:3px 9px;border-radius:999px;background:rgba(33,30,26,.07);font-weight:800;font-size:10.5px!important;letter-spacing:.06em;transition:background .22s,color .22s,transform .22s}
+.option-group__status.is-complete{background:#d8f0df;color:#14532d!important;transform:scale(1.04)}
+.option-group.is-invalid{background:rgba(235,20,12,.06);padding-inline:10px;border-color:var(--cochi-red);animation:groupShake .42s cubic-bezier(.36,.07,.19,.97) both}
+@keyframes groupShake{10%,90%{transform:translateX(-3px)}20%,80%{transform:translateX(5px)}30%,50%,70%{transform:translateX(-6px)}40%,60%{transform:translateX(6px)}}
+
+/* ---- Carrito: barra de 3 pasos, miniaturas, banner de ahorro y transiciones de vista ---- */
+.drawer-steps{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:12px 0 6px;padding:0;list-style:none}
+.drawer-step{display:flex;align-items:center;gap:7px;padding:7px 10px;border-radius:12px;background:rgba(33,30,26,.05);color:var(--ink-soft);font-size:11.5px;font-weight:800;transition:background .25s,color .25s,transform .2s}
+.drawer-step span{width:20px;height:20px;border-radius:50%;background:rgba(33,30,26,.12);color:var(--ink);font-size:11px;font-weight:900;display:grid;place-items:center;flex:none;transition:background .25s,color .25s}
+.drawer-step b{font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.drawer-step.is-active{background:var(--ink);color:var(--paper)}
+.drawer-step.is-active span{background:var(--cochi-red);color:#fff}
+.drawer-step.is-done{background:rgba(31,102,68,.12);color:var(--green);cursor:pointer}
+.drawer-step.is-done span{background:var(--green);color:#fff}
+.drawer-step.is-done:hover{background:rgba(31,102,68,.2)}
+
+.view-enter{animation:drawerViewIn .32s cubic-bezier(.2,.85,.25,1) both}
+@keyframes drawerViewIn{from{opacity:0;transform:translateX(14px)}to{opacity:1;transform:none}}
+
+.cart-line{grid-template-columns:52px 1fr auto;align-items:start;gap:12px}
+.cart-line__thumb{width:52px;height:52px;border-radius:14px;background:var(--cochi-cream);display:grid;place-items:center;overflow:hidden;flex:none;margin-top:2px}
+.cart-line__thumb img{width:100%;height:100%;object-fit:cover}
+.cart-line__thumb img[width="34"]{width:32px;height:auto;object-fit:contain}
+.cart-line__body{min-width:0}
+
+.cart-savings-banner{display:flex;align-items:center;justify-content:center;gap:7px;margin:0 0 10px;padding:9px 12px;border-radius:12px;background:#d8f0df;color:#14532d;font-size:12.5px;font-weight:700;text-align:center;animation:upsellIn .4s cubic-bezier(.2,1.4,.4,1) both}
+.cart-savings-banner[hidden]{display:none!important}
+.cart-savings-banner .ico{font-size:15px;color:#1c7a3d}
+
+.confirm-top-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:4px}
+.confirm-top-row .eyebrow{margin:0}
+.confirm-order-badge{padding:4px 10px;border-radius:999px;background:var(--cochi-cream);color:var(--ink);font-size:11.5px;font-weight:900;letter-spacing:.04em}
+
 /* Movimiento reducido: sin pulsos ni rebotes */
-@media (prefers-reduced-motion:reduce){.live-status.is-open i,.card-stepper,.repeat-card{animation:none}.category-chip.is-active{transform:none}}
-.motion-off .live-status.is-open i,.motion-off .card-stepper,.motion-off .repeat-card{animation:none}
+@media (prefers-reduced-motion:reduce){.live-status.is-open i,.card-stepper,.repeat-card,.view-enter,.option-group.is-invalid{animation:none}.category-chip.is-active,.qf-chip.is-active{transform:none}}
+.motion-off .live-status.is-open i,.motion-off .card-stepper,.motion-off .repeat-card,.motion-off .view-enter,.motion-off .option-group.is-invalid{animation:none}

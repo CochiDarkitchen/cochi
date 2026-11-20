@@ -41,7 +41,7 @@
   const WA_FOR_STAGE = { pending: ['received', 'Avisar que lo recibimos'], confirmed: ['total', 'Enviar total y datos de pago'], preparing: ['preparing', 'Avisar: en preparación'], ready: ['ready', 'Avisar: en camino'], delivered: ['thanks', 'Pedir opinión'] };
   const SOUND_KEY = 'cochi-admin-sound';
   let soundOn = (() => { try { return localStorage.getItem(SOUND_KEY) !== '0'; } catch { return true; } })();
-  let knownOrderIds = null, pollTimer = null, orderFilter = 'activas', orderQuery = '', ordersToday = false, productFilter = 'todos', customerSort = 'recientes';
+  let knownOrderIds = null, pollTimer = null, orderFilter = 'activas', orderQuery = '', ordersToday = false, productFilter = 'todos', productCatFilter = 'todas', stockQuery = '', compactOrders = false, customerSort = 'recientes';
   function beep() {
     if (!soundOn) return;
     try {
@@ -144,6 +144,7 @@
     const fee = parseFee(input.value);
     const summary = document.querySelector(`[data-fee-summary="${id}"]`); if (summary) summary.innerHTML = feeSummaryHtml(order, fee);
     const hint = document.querySelector(`[data-fee-hint="${id}"]`); if (hint) hint.hidden = fee !== null;
+    document.querySelectorAll(`[data-act="feePreset"][data-order-id="${id}"]`).forEach(btn => btn.classList.toggle('is-on', fee !== null && Number(btn.dataset.fee) === fee));
     if (fee === null) input.setAttribute('aria-invalid', 'true'); else input.removeAttribute('aria-invalid');
   }
 
@@ -295,7 +296,10 @@
     productos() {
       const counts = { todos: data.products.length, agotados: data.products.filter(p => p.available === false).length, ocultos: data.products.filter(p => p.is_visible === false).length, sinfoto: data.products.filter(p => !p.image).length, destacados: data.products.filter(p => p.featured).length };
       const chips = [['todos', 'Todos'], ['agotados', 'Agotados'], ['ocultos', 'Ocultos'], ['sinfoto', 'Sin foto'], ['destacados', 'Destacados']].map(([id, label]) => `<button type="button" class="fchip${productFilter === id ? ' is-on' : ''}" data-act="productFilter" data-filter="${id}" aria-pressed="${productFilter === id}">${label} <b>${counts[id]}</b></button>`).join('');
-      return `<div class="toolbar"><input type="search" id="q" placeholder="Buscar producto" value="${esc(query)}" aria-label="Buscar producto"><button type="button" class="btn btn--red" data-act="addProduct">Agregar</button></div><div class="filters" role="group" aria-label="Filtrar productos">${chips}</div><p class="muted">Consejo: los platos con foto se piden más. Usa “Sin foto” para ver cuáles faltan. Con las flechas cambias el orden en que aparecen en el menú.</p><div id="plist" style="display:grid;gap:12px">${productList()}</div>`;
+      const cats = categories();
+      if (productCatFilter !== 'todas' && !cats.includes(productCatFilter)) productCatFilter = 'todas';
+      const catChips = [['todas', 'Todas las categorías'], ...cats.map(c => [c, c])].map(([id, label]) => `<button type="button" class="fchip fchip--sub${productCatFilter === id ? ' is-on' : ''}" data-act="productCatFilter" data-cat="${esc(id)}" aria-pressed="${productCatFilter === id}">${esc(label)}</button>`).join('');
+      return `<div class="toolbar"><input type="search" id="q" placeholder="Buscar producto por nombre o categoría..." value="${esc(query)}" aria-label="Buscar producto">${counts.agotados ? `<button type="button" class="btn btn--small" data-act="allStockAvailable">Activar ${counts.agotados} agotado(s)</button>` : ''}<button type="button" class="btn btn--red" data-act="addProduct">+ Agregar plato</button></div><div class="filters" role="group" aria-label="Filtrar productos por estado">${chips}</div><div class="filters" role="group" aria-label="Filtrar productos por categoría">${catChips}</div><p class="muted">Consejo: los platos con foto se piden mucho más. Usa “Sin foto” para ver cuáles faltan. Con las flechas ↑ ↓ cambias el orden dentro de su categoría.</p><div id="plist" style="display:grid;gap:12px">${productList()}</div>`;
     },
     flyers() {
       const opts = link => {
@@ -373,12 +377,23 @@
       const maxTop = Math.max(1, ...top.map(([, v]) => v));
       const stock = data.products.map((p, i) => ({ p, i })).filter(({ p }) => p.is_visible !== false && !p.is_coming_soon);
       const outCount = stock.filter(({ p }) => p.available === false).length;
+      const withPhotoCount = stock.filter(({ p }) => Boolean(p.image)).length;
+      const sq = stockQuery.trim().toLowerCase();
+      const filteredStock = sq ? stock.filter(({ p }) => `${p.name} ${p.category}`.toLowerCase().includes(sq)) : stock;
       const hour = Number(new Intl.DateTimeFormat('en-US', { timeZone: 'America/Caracas', hour: '2-digit', hourCycle: 'h23' }).format(new Date()));
       const greeting = hour < 12 ? 'Buenos días' : hour < 19 ? 'Buenas tardes' : 'Buenas noches';
       const longDate = new Intl.DateTimeFormat('es-VE', { timeZone: 'America/Caracas', weekday: 'long', day: 'numeric', month: 'long' }).format(new Date());
       const sample = data.products.find(p => p.slug === 'shawarma-cesar') || data.products[0];
+      const rateOk = s.exchangeRateDate === today();
+      const payOk = Boolean(String(s.paymentInfo || '').trim());
+      const opsHtml = `<div class="ops-grid">
+        <div class="ops-item ${rateOk ? 'ops-item--ok' : 'ops-item--warn'}"><div><strong>Tasa BCV: Bs. ${money(s.usdToVes)}</strong><small>${rateOk ? 'Actualizada con fecha de hoy' : `Fecha ${esc(s.exchangeRateDate)} · no es de hoy`}</small></div>${rateOk ? '<span class="chip chip--on">Al día</span>' : '<button type="button" class="btn btn--small" data-act="today">Poner fecha de hoy</button>'}</div>
+        <div class="ops-item ${payOk ? 'ops-item--ok' : 'ops-item--warn'}"><div><strong>Datos para el depósito</strong><small>${payOk ? 'Listos para copiar y enviar por WhatsApp' : 'Aún no has escrito tu Pago Móvil o cuenta'}</small></div><button type="button" class="btn btn--small" data-act="goTab" data-goto="tasa">${payOk ? 'Editar' : 'Configurar'}</button></div>
+        <div class="ops-item ${withPhotoCount === stock.length ? 'ops-item--ok' : ''}"><div><strong>Fotos del menú (${withPhotoCount} de ${stock.length})</strong><small>${withPhotoCount < stock.length ? `Faltan ${stock.length - withPhotoCount} platos por fotografiar` : 'Todos los platos visibles tienen foto'}</small></div><button type="button" class="btn btn--small" data-act="goNoPhoto">Ver sin foto</button></div>
+      </div>`;
       const pendingList = pending.slice(0, 6).map(o => `<button type="button" class="mini-order" data-act="goTab" data-goto="comandas"><span class="mini-order__id">${esc(o.id)}</span><span class="mini-order__who">${esc(o.name)} · ${o.mode === 'pickup' ? 'Retiro' : 'Delivery'}${o.sector ? ` · ${esc(o.sector)}` : ''}</span><strong>${moneyText(o.total)}</strong><small>${esc(timeAgo(o.createdAt))}</small></button>`).join('');
       return `<section class="card status-card status-card--${state.kind}"><div class="status-card__main"><span class="status-card__dot" aria-hidden="true"></span><div><small>${greeting}, equipo Cochi · ${esc(longDate)}</small><h2>${esc(state.title)}</h2><p>${esc(state.detail)}</p></div></div><button type="button" class="btn ${s.ordersPaused ? 'btn--red' : 'btn--light'}" data-act="togglePause">${s.ordersPaused ? 'Reanudar pedidos' : 'Pausar pedidos ahora'}</button></section>
+        ${opsHtml}
         <section class="card"><div class="section-head"><div><h2>Hoy en Cochi</h2><p class="card__intro">Resumen del día con la hora de Caracas.</p></div><button type="button" class="btn btn--small" data-act="goTab" data-goto="comandas">Ir a comandas</button></div>
         <div class="metric-grid metric-grid--4"><div class="metric${pending.length ? ' metric--alert' : ''}"><strong>${pending.length}</strong><span>Por confirmar</span></div><div class="metric"><strong>${inProgress.length}</strong><span>En curso</span></div><div class="metric"><strong>${todayOrders.length}</strong><span>Pedidos de hoy</span></div><div class="metric"><strong>${moneyText(soldToday)}</strong><span>Confirmado hoy</span></div></div>
         ${pending.length ? `<h3 class="subheading">Esperan tu confirmación</h3><div class="mini-orders">${pendingList}</div>` : '<p class="empty-ok">Todo al día: no hay pedidos esperando confirmación.</p>'}
@@ -386,8 +401,9 @@
         <section class="card"><div class="section-head"><div><h2>Tasa del día</h2><p class="card__intro">Actualízala antes de abrir. Los precios en bolívares del menú se calculan solos.</p></div>${s.exchangeRateDate === today() ? '<span class="chip chip--on">Fecha de hoy</span>' : '<span class="chip chip--soon">No es de hoy</span>'}</div>
         <div class="row2">${field('Bolívares por 1 USD', 'settings.usdToVes', s.usdToVes, 'type="number" data-t="n" step="0.01" min="0" inputmode="decimal" data-after="bs"')}<div class="row-inline">${field('Fecha de la tasa', 'settings.exchangeRateDate', s.exchangeRateDate, 'type="date"')}<button type="button" class="btn btn--small" data-act="today">Hoy</button></div></div>
         <p class="preview" id="ratePreview">${sample ? `${esc(sample.name)}: $${money(sample.price_usd)} = Bs. ${bs(sample.price_usd)}` : ''}</p></section>
-        <section class="card"><div class="section-head"><div><h2>¿Qué hay hoy?</h2><p class="card__intro">Toca un producto para marcarlo como agotado o disponible. Se publica al pulsar <strong>Guardar cambios</strong>.</p></div><span class="chip ${outCount ? 'chip--off' : 'chip--on'}">${outCount ? `${outCount} agotado(s)` : 'Todo disponible'}</span></div>
-        <div class="stock-grid">${stock.map(({ p, i }) => `<label class="stock${p.available === false ? ' is-out' : ''}"><input type="checkbox" data-b="products.${i}.available" data-after="rerender" ${p.available !== false ? 'checked' : ''}><span class="stock__name">${esc(p.name)}</span><span class="stock__state">${p.available !== false ? 'Disponible' : 'Agotado'}</span></label>`).join('')}</div></section>
+        <section class="card"><div class="section-head"><div><h2>¿Qué hay hoy?</h2><p class="card__intro">Toca un producto para marcarlo como agotado o disponible. Se publica al pulsar <strong>Guardar cambios</strong>.</p></div><div class="head-actions">${outCount ? `<button type="button" class="btn btn--small" data-act="allStockAvailable">Activar todos (${outCount})</button>` : ''}<span class="chip ${outCount ? 'chip--off' : 'chip--on'}">${outCount ? `${outCount} agotado(s)` : 'Todo disponible'}</span></div></div>
+        <div class="toolbar"><input type="search" id="stockSearch" placeholder="Filtrar plato rápido (ej. shawarma, pollo, papas...)" value="${esc(stockQuery)}" aria-label="Filtrar disponibilidad rápida"></div>
+        <div class="stock-grid" id="stockGrid">${filteredStock.map(({ p, i }) => `<label class="stock${p.available === false ? ' is-out' : ''}"><input type="checkbox" data-b="products.${i}.available" data-after="rerender" ${p.available !== false ? 'checked' : ''}><span class="stock__name">${esc(p.name)}</span><small class="stock__meta">${esc(p.category)} · $${money(p.price_usd)}</small><span class="stock__state">${p.available !== false ? 'Disponible' : 'Agotado'}</span></label>`).join('')}</div></section>
         ${top.length ? `<section class="card"><h2>Lo más pedido esta semana</h2>${top.map(([name, qty]) => `<div class="bar-row"><div><span>${esc(name)}</span><strong>${qty} uds.</strong></div><span class="bar-track"><i style="width:${Math.round(qty / maxTop * 100)}%"></i></span></div>`).join('')}</section>` : ''}`;
     },
     comandas() {
@@ -400,12 +416,12 @@
       const soldToday = todayOrders.filter(isConfirmed).reduce((sum, o) => sum + (Number(o.finalTotalUSD) || 0), 0);
       const filterBar = FILTERS.map(([id, label]) => { const n = id === 'pending' ? count('pending') : id === 'encurso' ? count('confirmed') + count('preparing') + count('ready') : 0; return `<button type="button" class="fchip${orderFilter === id ? ' is-on' : ''}" data-act="orderFilter" data-filter="${id}" aria-pressed="${orderFilter === id}">${label}${n ? ` <b>${n}</b>` : ''}</button>`; }).join('');
       const cards = list.slice(0, ordersLimit).map(orderCard).join('');
-      return `<section class="card"><div class="section-head"><div><h2>Comandas y pedidos</h2><p class="card__intro">Cada pedido enviado a WhatsApp llega aquí como <strong>por confirmar</strong>. Escribe el delivery, confirma e imprime la comanda de 58 mm, y luego avanza el pedido: en preparación, en camino y entregado. Confirmar registra el monto acordado, no el pago recibido.</p></div><div class="head-actions"><button type="button" class="btn btn--small" data-act="refreshOrders">Actualizar</button><button type="button" class="btn btn--small" data-act="exportOrders">Descargar para Excel</button></div></div>
+      return `<section class="card"><div class="section-head"><div><h2>Comandas y pedidos</h2><p class="card__intro">Cada pedido enviado a WhatsApp llega aquí como <strong>por confirmar</strong>. Elige o escribe el delivery, confirma e imprime la comanda de 58 mm, y luego avanza el pedido: en preparación, en camino y entregado. Confirmar registra el monto acordado, no el pago recibido.</p></div><div class="head-actions"><button type="button" class="btn btn--small" data-act="toggleCompactOrders" aria-pressed="${compactOrders}">${compactOrders ? 'Vista detallada' : 'Vista compacta'}</button><button type="button" class="btn btn--small" data-act="refreshOrders">Actualizar</button><button type="button" class="btn btn--small" data-act="exportOrders">Descargar para Excel</button></div></div>
         <div class="metric-grid metric-grid--4"><div class="metric${count('pending') ? ' metric--alert' : ''}"><strong>${count('pending')}</strong><span>Por confirmar</span></div><div class="metric"><strong>${count('confirmed') + count('preparing') + count('ready')}</strong><span>En curso</span></div><div class="metric"><strong>${todayOrders.length}</strong><span>Pedidos de hoy</span></div><div class="metric"><strong>${moneyText(soldToday)}</strong><span>Confirmado hoy</span></div></div>
         <div class="filters" role="group" aria-label="Filtrar comandas">${filterBar}</div>
-        <div class="toolbar"><input type="search" id="orderSearch" placeholder="Buscar cliente, teléfono o número" value="${esc(orderQuery)}" aria-label="Buscar comandas"><label class="chk chk--pill"><input type="checkbox" id="ordersToday" ${ordersToday ? 'checked' : ''}> Solo hoy</label></div>
+        <div class="toolbar"><input type="search" id="orderSearch" placeholder="Buscar cliente, teléfono, sector o número..." value="${esc(orderQuery)}" aria-label="Buscar comandas"><label class="chk chk--pill"><input type="checkbox" id="ordersToday" ${ordersToday ? 'checked' : ''}> Solo hoy</label></div>
         <p class="muted live-note"><span class="live-dot" aria-hidden="true"></span> Se actualiza sola cada 30 segundos. <button type="button" class="linkbtn" data-act="toggleSound">${soundOn ? 'Sonido de aviso: activado' : 'Sonido de aviso: apagado'}</button></p></section>
-        ${cards || `<section class="card"><p class="muted">${orders.length ? 'No hay comandas con este filtro.' : 'Todavía no hay pedidos. Cuando un cliente envíe su solicitud a WhatsApp, aparecerá aquí.'}</p></section>`}${list.length > ordersLimit ? `<button type="button" class="btn btn--small" data-act="loadMoreOrders">Mostrar ${Math.min(50, list.length - ordersLimit)} pedidos más</button>` : ''}`;
+        ${cards ? `<div class="orders-list${compactOrders ? ' orders-list--compact' : ''}">${cards}</div>` : `<section class="card"><p class="muted">${orders.length ? 'No hay comandas con este filtro.' : 'Todavía no hay pedidos. Cuando un cliente envíe su solicitud a WhatsApp, aparecerá aquí.'}</p></section>`}${list.length > ordersLimit ? `<button type="button" class="btn btn--small" data-act="loadMoreOrders">Mostrar ${Math.min(50, list.length - ordersLimit)} pedidos más</button>` : ''}`;
     },
     estadisticas() {
       const cutoff = statsPeriod === 'all' ? 0 : Date.now() - Number(statsPeriod) * 86400000;
@@ -444,7 +460,16 @@
         const max = Math.max(1, ...entries.map(([,v])=>Number(v)||0));
         return entries.map(([label,value]) => `<div class="bar-row"><div><span>${esc(label)}</span><strong>${formatter(value)}</strong></div><span class="bar-track"><i style="width:${Math.max(0,Math.min(100,(Number(value)||0)/max*100))}%"></i></span></div>`).join('');
       };
-      return `<section class="card"><div class="section-head"><div><h2>Estadísticas de Cochi</h2><p class="card__intro">Comportamiento de los pedidos registrados. Horas y días calculados con la hora de Caracas.</p></div><label class="field period-field">Período<select id="statsPeriod"><option value="7" ${statsPeriod==='7'?'selected':''}>Últimos 7 días</option><option value="30" ${statsPeriod==='30'?'selected':''}>Últimos 30 días</option><option value="90" ${statsPeriod==='90'?'selected':''}>Últimos 90 días</option><option value="all" ${statsPeriod==='all'?'selected':''}>Todo el historial</option></select></label></div><div class="metric-grid"><div class="metric"><strong>${filtered.length}</strong><span>Pedidos recibidos</span></div><div class="metric"><strong>${confirmed.length}</strong><span>Comandas confirmadas</span></div><div class="metric"><strong>${moneyText(revenue)}</strong><span>Monto confirmado</span></div><div class="metric"><strong>${moneyText(avg)}</strong><span>Promedio por comanda</span></div></div><p class="muted">${pending} pedido(s) aún pendiente(s) de confirmar${cancelledCount ? ` · ${cancelledCount} cancelado(s), que no se suman` : ''}. El monto mostrado corresponde a precios confirmados por el equipo; no significa necesariamente que el depósito ya fue recibido.</p></section><section class="card"><h2>Ventas confirmadas por día</h2><p class="card__intro">Últimos 14 días (montos confirmados con delivery).</p>${barList(lastDays, v => moneyText(v))}</section><section class="card"><h2>Productos más pedidos</h2><p class="card__intro">Ranking por unidades solicitadas; incluye pedidos pendientes y confirmados.</p>${topProducts.length ? barList(topProducts.map(([name,v])=>[name,v.qty]), v=>`${v} uds.`) : '<p class="muted">Aún no hay datos suficientes.</p>'}${bestProduct ? `<p class="preview">El producto con más unidades en este período es <strong>${esc(bestProduct[0])}</strong> (${bestProduct[1].qty} unidades).</p>` : ''}</section><section class="card"><h2>¿Cuándo piden?</h2><p class="card__intro">Distribución por día de la semana y hora de recepción del pedido.</p><h3 class="subheading">Días</h3>${barList(days, v=>`${v} pedidos`)}<h3 class="subheading">Horas</h3>${barList(hours, v=>`${v} pedidos`)}${bestDay ? `<p class="preview">Día con más actividad: <strong>${esc(bestDay[0])}</strong> (${bestDay[1]} pedidos).</p>` : ''}</section><section class="card"><h2>Franjas de actividad</h2>${windowMap.size ? barList([...windowMap.entries()], v=>`${v} pedidos`) : '<p class="muted">Todavía no hay pedidos registrados.</p>'}${bestPeriod ? `<p class="preview">Mayor movimiento: <strong>${esc(bestPeriod[0])}</strong>.</p>` : ''}</section>`;
+      const maxDaySale = Math.max(1, ...lastDays.map(([, v]) => Number(v) || 0));
+      const vchartHtml = `<div class="vchart" role="img" aria-label="Gráfica de barras de ventas confirmadas en los últimos 14 días">${lastDays.map(([label, val]) => {
+        const pct = Math.round((Number(val) || 0) / maxDaySale * 100);
+        return `<div class="vchart__col" title="${esc(label)}: ${moneyText(val)}"><span class="vchart__val">${val > 0 ? `$${Math.round(val)}` : ''}</span><span class="vchart__track"><i style="height:${Math.max(val > 0 ? 10 : 2, pct)}%"></i></span><small class="vchart__lbl">${esc(label)}</small></div>`;
+      }).join('')}</div>`;
+      const activeOrders = filtered.filter(o => !isCancelled(o));
+      const deliveryCount = activeOrders.filter(o => o.mode !== 'pickup').length;
+      const pickupCount = activeOrders.length - deliveryCount;
+      const convRate = filtered.length ? Math.round(confirmed.length / filtered.length * 100) : 0;
+      return `<section class="card"><div class="section-head"><div><h2>Estadísticas de Cochi</h2><p class="card__intro">Comportamiento de los pedidos registrados. Horas y días calculados con la hora de Caracas.</p></div><label class="field period-field">Período<select id="statsPeriod"><option value="7" ${statsPeriod==='7'?'selected':''}>Últimos 7 días</option><option value="30" ${statsPeriod==='30'?'selected':''}>Últimos 30 días</option><option value="90" ${statsPeriod==='90'?'selected':''}>Últimos 90 días</option><option value="all" ${statsPeriod==='all'?'selected':''}>Todo el historial</option></select></label></div><div class="metric-grid"><div class="metric"><strong>${filtered.length}</strong><span>Pedidos recibidos</span></div><div class="metric"><strong>${confirmed.length} <small class="muted">(${convRate}%)</small></strong><span>Comandas confirmadas</span></div><div class="metric"><strong>${moneyText(revenue)}</strong><span>Monto confirmado</span></div><div class="metric"><strong>${moneyText(avg)}</strong><span>Promedio por comanda</span></div></div><p class="muted">${pending} pedido(s) aún pendiente(s) de confirmar${cancelledCount ? ` · ${cancelledCount} cancelado(s), que no se suman` : ''} · Modalidad: <strong>${deliveryCount} Delivery</strong> / <strong>${pickupCount} Retiro</strong>. El monto mostrado corresponde a precios confirmados por el equipo; no significa necesariamente que el depósito ya fue recibido.</p></section><section class="card"><h2>Ventas confirmadas por día</h2><p class="card__intro">Últimos 14 días (montos confirmados con delivery).</p>${vchartHtml}${barList(lastDays, v => moneyText(v))}</section><section class="card"><h2>Productos más pedidos</h2><p class="card__intro">Ranking por unidades solicitadas; incluye pedidos pendientes y confirmados.</p>${topProducts.length ? barList(topProducts.map(([name,v])=>[name,v.qty]), v=>`${v} uds.`) : '<p class="muted">Aún no hay datos suficientes.</p>'}${bestProduct ? `<p class="preview">El producto con más unidades en este período es <strong>${esc(bestProduct[0])}</strong> (${bestProduct[1].qty} unidades).</p>` : ''}</section><section class="card"><h2>¿Cuándo piden?</h2><p class="card__intro">Distribución por día de la semana y hora de recepción del pedido.</p><h3 class="subheading">Días</h3>${barList(days, v=>`${v} pedidos`)}<h3 class="subheading">Horas</h3>${barList(hours, v=>`${v} pedidos`)}${bestDay ? `<p class="preview">Día con más actividad: <strong>${esc(bestDay[0])}</strong> (${bestDay[1]} pedidos).</p>` : ''}</section><section class="card"><h2>Franjas de actividad</h2>${windowMap.size ? barList([...windowMap.entries()], v=>`${v} pedidos`) : '<p class="muted">Todavía no hay pedidos registrados.</p>'}${bestPeriod ? `<p class="preview">Mayor movimiento: <strong>${esc(bestPeriod[0])}</strong>.</p>` : ''}</section>`;
     },
     clientes() {
       const q = customerQuery.trim().toLowerCase();
@@ -498,7 +523,9 @@
       feeBox = `<div class="fee-box"><div class="fee-box__head"><h4>Retiro en Cochi</h4></div><p class="muted">No se cobra delivery. Total a cobrar: <strong>${moneyText(orderBase(order))}</strong></p>${previewBtn}</div>`;
     } else if (stage === 'pending') {
       const raw = feeValue(order), fee = parseFee(raw);
-      feeBox = `<div class="fee-box"><div class="fee-box__head"><h4>Delivery</h4><small>Costo real acordado con el cliente</small></div>
+      const presets = [0, 1, 1.5, 2, 2.5, 3, 4, 5].map(v => `<button type="button" class="fee-chip${fee === v ? ' is-on' : ''}" data-act="feePreset" data-order-id="${id}" data-fee="${v}">${v === 0 ? 'Gratis $0' : `$${v}`}</button>`).join('');
+      feeBox = `<div class="fee-box"><div class="fee-box__head"><h4>Delivery</h4><small>Toca un monto rápido o escribe el costo acordado</small></div>
+        <div class="fee-presets" role="group" aria-label="Montos rápidos de delivery">${presets}</div>
         <div class="fee-row"><button type="button" class="btn fee-step" data-act="feeStep" data-order-id="${id}" data-step="-0.5" aria-label="Restar 0,50 al delivery">−</button>
         <label class="fee-input"><span class="sr-only">Costo de delivery en USD</span><b aria-hidden="true">$</b><input type="number" data-order-fee="${id}" min="0" max="999" step="0.01" inputmode="decimal" value="${esc(raw)}" placeholder="0.00" ${fee === null ? 'aria-invalid="true"' : ''}></label>
         <button type="button" class="btn fee-step" data-act="feeStep" data-order-id="${id}" data-step="0.5" aria-label="Sumar 0,50 al delivery">+</button></div>
@@ -511,17 +538,20 @@
     const next = NEXT_STAGE[stage];
     const nextBtn = next ? `<button type="button" class="btn btn--red btn--small" data-act="setStatus" data-order-id="${id}" data-status="${next}">${nextLabel(order, next)}</button>` : '';
     const printBtn = confirmed ? `<button type="button" class="btn btn--small" data-act="previewOrder" data-order-id="${id}">Vista previa e imprimir</button>` : '';
+    const copyBtn = `<button type="button" class="btn btn--small" data-act="copyOrderSummary" data-order-id="${id}">Copiar cobro</button>`;
     const cancelBtn = ['pending', 'confirmed', 'preparing', 'ready'].includes(stage) ? `<button type="button" class="btn btn--danger" data-act="cancelOrder" data-order-id="${id}">Cancelar</button>` : '';
     const reopenBtn = stage === 'cancelled' ? `<button type="button" class="btn btn--small" data-act="reopenOrder" data-order-id="${id}">Reactivar</button>` : '';
     const mapLink = !isPickup && order.address ? ` · <a class="linkbtn" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${order.address} ${order.sector || ''}`)}" target="_blank" rel="noopener">Ver en mapa</a>` : '';
     const telLink = order.phone ? `<a class="linkbtn" href="tel:${esc(String(order.phone).replace(/[^\d+]/g, ''))}">${esc(order.phone)}</a>` : '';
-    return `<article class="item order-card order-card--${stage}"><div class="order-head"><div><h3>${esc(order.id || 'Comanda')}</h3><p class="muted">${dateTime(order.createdAt)} · ${esc(timeAgo(order.createdAt))} · ${isPickup ? 'Retiro' : 'Delivery'}</p></div><span class="chip chip--${STAGE_CHIP[stage]}">${esc(stageLabel(order))}</span></div>
+    const waitMinutes = order.createdAt ? Math.round((Date.now() - new Date(order.createdAt).getTime()) / 60000) : 0;
+    const urgentChip = stage === 'pending' && waitMinutes >= 10 ? `<span class="chip chip--urgent">⏱ ${esc(timeAgo(order.createdAt))}</span>` : '';
+    return `<article class="item order-card order-card--${stage}"><div class="order-head"><div><h3>${esc(order.id || 'Comanda')}</h3><p class="muted">${dateTime(order.createdAt)} · ${esc(timeAgo(order.createdAt))} · ${isPickup ? 'Retiro' : 'Delivery'}</p></div><div class="order-head__chips">${urgentChip}<span class="chip chip--${STAGE_CHIP[stage]}">${esc(stageLabel(order))}</span></div></div>
       ${confirmed ? orderProgress(order, stage) : ''}
       <div class="order-customer"><strong>${esc(order.name)}</strong> · ${telLink}${order.address ? `<br>${esc(order.address)} · ${esc(order.sector || '')}${mapLink}` : ''}${order.reference ? `<br>Referencia: ${esc(order.reference)}` : ''}</div>
       <div class="order-items">${items || '<p class="muted">No hay detalle de productos.</p>'}</div>
       <div class="order-totals"><span>Productos</span><strong>${moneyText(order.productsTotal ?? (Number(order.total || 0) + Number(order.discount || 0)))}</strong>${Number(order.discount) > 0 ? `<span>Cupón ${esc(order.couponCode || '')}</span><strong>-${moneyText(order.discount)}</strong>` : ''}<span>Subtotal</span><strong>${moneyText(order.total ?? order.productsTotal)}</strong>${hasTotal(order) ? `<span>Delivery</span><strong>${moneyText(order.deliveryFeeUSD || 0)}</strong><span>Total confirmado</span><strong>${moneyText(order.finalTotalUSD)}</strong>` : ''}</div>
       ${order.notes ? `<p class="preview"><strong>Notas:</strong> ${esc(order.notes)}</p>` : ''}${stage === 'cancelled' && order.cancelReason ? `<p class="preview"><strong>Motivo de cancelación:</strong> ${esc(order.cancelReason)}</p>` : ''}
-      ${feeBox}<div class="item__bar">${nextBtn}${waBtn}${printBtn}${reopenBtn}${cancelBtn}</div></article>`;
+      ${feeBox}<div class="item__bar">${nextBtn}${waBtn}${printBtn}${copyBtn}${reopenBtn}${cancelBtn}</div></article>`;
   }
   async function changeStatus(id, status, reason = '') {
     const result = await api(`orders/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify({ status, reason }) });
@@ -572,21 +602,29 @@
   function productList() {
     const q = query.trim().toLowerCase();
     const keep = { todos: () => true, agotados: p => p.available === false, ocultos: p => p.is_visible === false, sinfoto: p => !p.image, destacados: p => p.featured }[productFilter] || (() => true);
-    const rows = data.products.map((p, i) => ({ p, i })).filter(({ p }) => keep(p) && (!q || `${p.name} ${p.category}`.toLowerCase().includes(q)));
+    const keepCat = p => productCatFilter === 'todas' || p.category === productCatFilter;
+    const rows = data.products.map((p, i) => ({ p, i })).filter(({ p }) => keep(p) && keepCat(p) && (!q || `${p.name} ${p.category} ${p.tag || ''}`.toLowerCase().includes(q)));
     if (!rows.length) return '<p class="muted">No hay productos con ese filtro o nombre.</p>';
     const groups = new Map(); rows.forEach(r => groups.set(r.p.category, [...(groups.get(r.p.category) || []), r]));
     return [...groups].map(([cat, list]) => `<h3 class="cat">${esc(cat)} <small>${list.length}</small></h3>${list.map(({ p, i }) => productRow(p, i)).join('')}`).join('');
   }
   function productRow(p, i) {
     const open = openSlug === p.slug;
-    return `<article class="prow ${p.is_visible === false ? 'is-off' : ''}" data-slug="${esc(p.slug)}"><div class="prow__main">${thumb(p.image)}
-      <div class="prow__name"><strong>${esc(p.name)}</strong><small>${p.tag ? `${esc(p.tag)} · ` : ''}${p.is_coming_soon ? 'Próximamente' : 'Precio en USD'}</small></div>
+    const metaBadges = [
+      p.featured ? '<span class="pmeta pmeta--star">★ Destacado</span>' : '',
+      (p.options || []).length ? `<span class="pmeta">${p.options.length} opc.</span>` : '',
+      (p.availability_days || []).length ? '<span class="pmeta">Días esp.</span>' : '',
+      !p.image ? '<span class="pmeta pmeta--warn">Sin foto</span>' : ''
+    ].filter(Boolean).join('');
+    return `<article class="prow ${p.is_visible === false ? 'is-off' : ''}${open ? ' is-open' : ''}" data-slug="${esc(p.slug)}"><div class="prow__main">${thumb(p.image)}
+      <div class="prow__name"><strong>${esc(p.name)}</strong><small>${p.tag ? `${esc(p.tag)} · ` : ''}${p.is_coming_soon ? 'Próximamente' : esc(p.category)}</small>${metaBadges ? `<div class="prow__badges">${metaBadges}</div>` : ''}</div>
       <div class="price"><input type="number" data-b="products.${i}.price_usd" data-t="n" data-after="bs" value="${esc(p.price_usd)}" step="0.01" min="0" inputmode="decimal" aria-label="Precio de ${esc(p.name)} en USD"><small data-bs="${i}">Bs. ${bs(p.price_usd)}</small></div></div>
       <div class="prow__bar">${sw(`products.${i}.is_visible`, p.is_visible !== false, 'Visible')}${sw(`products.${i}.available`, p.available !== false, 'Disponible')}<button type="button" class="btn btn--small" data-act="editProduct" data-slug="${esc(p.slug)}">${open ? 'Cerrar' : 'Editar'}</button><span class="order-btns"><button type="button" class="btn btn--small btn--icon" data-act="moveProduct" data-i="${i}" data-dir="-1" aria-label="Subir ${esc(p.name)} en el menú">↑</button><button type="button" class="btn btn--small btn--icon" data-act="moveProduct" data-i="${i}" data-dir="1" aria-label="Bajar ${esc(p.name)} en el menú">↓</button></span></div>
-      ${open ? `<div class="editor">${field('Nombre', `products.${i}.name`, p.name, 'maxlength="80"')}
+      ${open ? `<div class="editor">
+        <div class="live-card-preview" aria-label="Vista previa en el menú">${thumb(p.image, 'live-card-preview__img')}<div class="live-card-preview__body"><small>${esc(p.category)}${p.tag ? ` · <b>${esc(p.tag)}</b>` : ''}</small><strong>${esc(p.name)}</strong><p>${esc(p.description || 'Sin descripción')}</p><span class="live-card-preview__price">$${money(p.price_usd)} · <em data-bs="${i}">Bs. ${bs(p.price_usd)}</em></span></div></div>
+        <div class="row2">${field('Nombre', `products.${i}.name`, p.name, 'maxlength="80"')}<label class="field">Categoría<input data-b="products.${i}.category" value="${esc(p.category)}" list="catList" maxlength="40"><datalist id="catList">${categories().map(c => `<option value="${esc(c)}">`).join('')}</datalist></label></div>
         ${field('Etiqueta (opcional)', `products.${i}.tag`, p.tag || '', 'maxlength="16" list="tagList" placeholder="Nuevo, Más pedido, Picante..."', 'Aparece sobre la foto del producto en el menú.')}<datalist id="tagList"><option value="Nuevo"><option value="Más pedido"><option value="Picante"><option value="Oferta"><option value="Solo domingos"></datalist>
         <label class="field">Descripción<textarea data-b="products.${i}.description" maxlength="420" rows="3">${esc(p.description)}</textarea></label>
-        <label class="field">Categoría<input data-b="products.${i}.category" value="${esc(p.category)}" list="catList" maxlength="40"><datalist id="catList">${categories().map(c => `<option value="${esc(c)}">`).join('')}</datalist></label>
         <div class="imgbox">${thumb(p.image)}<div class="imgbox__btns"><button type="button" class="btn btn--small" data-act="imgProduct" data-i="${i}">${p.image ? 'Cambiar foto' : 'Subir foto'}</button>${p.image ? `<button type="button" class="btn btn--danger" data-act="rmImg" data-i="${i}">Quitar foto</button>` : ''}</div></div>
         <div class="prow__bar">${sw(`products.${i}.featured`, p.featured, 'Destacado en favoritos')}${sw(`products.${i}.is_coming_soon`, p.is_coming_soon, 'Próximamente')}</div>
         <div class="field">Días en que se vende (sin marcar = todos los días)<div class="checks">${['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'].map((d, day) => `<label class="chk"><input type="checkbox" data-act-change="prodDay" data-i="${i}" value="${day}" ${(p.availability_days || []).includes(day) ? 'checked' : ''}>${d}</label>`).join('')}</div></div>
@@ -595,7 +633,20 @@
   }
 
   function render() {
-    $('#tabs').innerHTML = TABS.map(([id, label]) => `<button type="button" class="tab" aria-current="${id === tab ? 'page' : 'false'}" data-tab="${id}">${label}</button>`).join('');
+    const pendingCount = orders.filter(isPending).length;
+    const outCount = data?.products ? data.products.filter(p => p.is_visible !== false && !p.is_coming_soon && p.available === false).length : 0;
+    const topMeta = $('#topMeta');
+    if (topMeta && data?.settings) {
+      const st = storeState();
+      const rateToday = data.settings.exchangeRateDate === today();
+      topMeta.innerHTML = `<button type="button" class="top-pill top-pill--${st.kind}" data-act="goTab" data-goto="inicio"><i aria-hidden="true"></i><span>${st.kind === 'open' ? 'Abierto' : st.kind === 'paused' ? 'En pausa' : 'Cerrado'}</span></button><button type="button" class="top-pill${rateToday ? '' : ' top-pill--warn'}" data-act="goTab" data-goto="tasa"><span>Bs. ${money(data.settings.usdToVes)}</span></button>`;
+    }
+    $('#tabs').innerHTML = TABS.map(([id, label]) => {
+      const badge = id === 'comandas' && pendingCount ? `<b class="tab__badge">${pendingCount}</b>` : id === 'productos' && outCount ? `<b class="tab__badge tab__badge--warn">${outCount}</b>` : '';
+      return `<button type="button" class="tab" aria-current="${id === tab ? 'page' : 'false'}" data-tab="${id}">${label}${badge}</button>`;
+    }).join('');
+    const activeTabEl = $('#tabs .tab[aria-current="page"]');
+    activeTabEl?.scrollIntoView({ inline: 'center', block: 'nearest' });
     $('#panel').innerHTML = VIEWS[tab]();
     const banner = $('#banner');
     banner.hidden = false; banner.className = 'banner';
@@ -646,6 +697,27 @@
     },
     orderFilter(el) { orderFilter = el.dataset.filter; ordersLimit = 50; render(); },
     productFilter(el) { productFilter = el.dataset.filter; render(); },
+    productCatFilter(el) { productCatFilter = el.dataset.cat; render(); },
+    goNoPhoto() { productFilter = 'sinfoto'; productCatFilter = 'todas'; switchTab('productos'); },
+    allStockAvailable() { data.products.forEach(p => { if (!p.is_coming_soon) p.available = true; }); markDirty(); render(); toast('Todos los platos marcados como disponibles. Pulsa Guardar cambios.'); },
+    toggleCompactOrders() { compactOrders = !compactOrders; render(); },
+    feePreset(el) {
+      const input = document.querySelector(`[data-order-fee="${el.dataset.orderId}"]`); if (!input) return;
+      input.value = Number(el.dataset.fee).toFixed(2);
+      syncFee(input);
+    },
+    async copyOrderSummary(el) {
+      const order = orders.find(o => String(o.id) === el.dataset.orderId); if (!order) return;
+      const input = document.querySelector(`[data-order-fee="${order.id}"]`);
+      const draftFee = !isConfirmed(order) && order.mode !== 'pickup' ? parseFee(input ? input.value : feeValue(order)) : Number(order.deliveryFeeUSD || 0);
+      const total = hasTotal(order) ? Number(order.finalTotalUSD) : round2(orderBase(order) + (draftFee || 0));
+      const rate = orderRate(order), bsText = rate > 0 ? `Bs. ${fmtBs(total * rate)} (tasa ${money(rate)})` : '';
+      const pay = String(data?.settings?.paymentInfo || '').trim();
+      const itemsText = (order.items || []).map(it => `• ${it.quantity}x ${it.name}: ${moneyText(it.lineTotal ?? Number(it.unitPrice || 0) * Number(it.quantity || 1))}`).join('\n');
+      const summary = [`*COCHI · COMANDA ${order.id}*`, `Cliente: ${order.name} (${order.phone})`, itemsText, order.mode === 'pickup' ? 'Modalidad: Retiro' : `Delivery: ${draftFee === null ? 'Por confirmar' : moneyText(draftFee)}`, `*Total a pagar: ${moneyText(total)}*${bsText ? `\n*En bolívares: ${bsText}*` : ''}`, pay ? `\n*Datos de pago:*\n${pay}` : ''].filter(Boolean).join('\n');
+      try { await navigator.clipboard.writeText(summary); toast(`Resumen de ${order.id} copiado al portapapeles.`); }
+      catch { toast('No se pudo copiar automáticamente.', true); }
+    },
     toggleSound() { soundOn = !soundOn; try { localStorage.setItem(SOUND_KEY, soundOn ? '1' : '0'); } catch { /* sin almacenamiento */ } if (soundOn) beep(); render(); toast(soundOn ? 'Sonido de aviso activado.' : 'Sonido de aviso apagado.'); },
     async setStatus(el) { await changeStatus(el.dataset.orderId, el.dataset.status); },
     async cancelOrder(el) {
@@ -769,6 +841,7 @@
   document.addEventListener('input', event => {
     if (event.target.matches('[data-order-fee]')) { syncFee(event.target); return; }
     if (event.target.id === 'q') { query = event.target.value; $('#plist').innerHTML = productList(); return; }
+    if (event.target.id === 'stockSearch') { stockQuery = event.target.value; const pos = event.target.selectionStart; render(); const input = $('#stockSearch'); input?.focus(); input?.setSelectionRange(pos, pos); return; }
     if (event.target.id === 'orderSearch') { orderQuery = event.target.value; const pos = event.target.selectionStart; render(); const input = $('#orderSearch'); input.focus(); input.setSelectionRange(pos, pos); return; }
     if (event.target.id === 'customerSearch') { customerQuery = event.target.value; const pos = event.target.selectionStart; render(); const input = $('#customerSearch'); input.focus(); input.setSelectionRange(pos, pos); return; }
     if (event.target.id === 'campaignText') { campaignText = event.target.value; campaignLinksReady = false; return; }

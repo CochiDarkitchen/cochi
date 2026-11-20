@@ -56,6 +56,7 @@
     <p class="intro__word" aria-label="Cochi"><i style="--i:0">C</i><i style="--i:1">O</i><i style="--i:2">C</i><i style="--i:3">H</i><i style="--i:4">I</i><b class="reg">&reg;</b></p>
     <p class="intro__caption">EL ANTOJO TIENE NOMBRE</p>
     <div class="intro__underline" aria-hidden="true"></div>
+    <button type="button" class="intro__skip" id="skipIntro">Saltar intro <svg class="ico" aria-hidden="true"><use href="#i-arrow"/></svg></button>
     <div class="intro__checker" aria-hidden="true"></div>
   </div>
 
@@ -139,7 +140,16 @@
       <div class="section-wrap">
         <div class="menu-topline reveal"><p class="eyebrow"><span class="eyebrow__line"></span> ELIGE TU JUGADA</p><span class="menu-topline__note">TODO EMPIEZA POR AQUÍ <svg class="ico ico--dl" aria-hidden="true"><use href="#i-arrow"/></svg></span></div>
         <div class="menu-title-row reveal"><h2 id="menu-title">EL <em>MENÚ.</em></h2><p>Ve por tu clásico, prueba algo distinto o arma el pedido como te gusta. Aquí tienes todas las opciones del menú Cochi.</p></div>
-        <label class="menu-search menu-search--top"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.6"/><path d="m16 16 4.5 4.5"/></svg><span class="sr-only">Buscar en el menú</span><input id="menuSearch" type="search" placeholder="Busca tu antojo: shawarma, costillas, papas..." autocomplete="off"></label>
+        <div class="menu-search-row">
+          <label class="menu-search menu-search--top"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.6"/><path d="m16 16 4.5 4.5"/></svg><span class="sr-only">Buscar en el menú</span><input id="menuSearch" type="search" placeholder="Busca tu antojo: shawarma, costillas, papas, marquesa..." autocomplete="off"><button type="button" class="menu-search__clear" id="menuSearchClear" aria-label="Limpiar búsqueda" hidden>×</button></label>
+          <div class="quick-filters" id="quickFilters" role="group" aria-label="Filtros rápidos del menú">
+            <button type="button" class="qf-chip" data-qf="favoritos" aria-pressed="false">🔥 Favoritos</button>
+            <button type="button" class="qf-chip" data-qf="promo" aria-pressed="false">🍟 Con promo</button>
+            <button type="button" class="qf-chip" data-qf="compartir" aria-pressed="false">🍖 Para compartir</button>
+            <button type="button" class="qf-chip" data-qf="economicos" aria-pressed="false">💸 Hasta $8</button>
+            <button type="button" class="qf-chip" data-qf="dulce" aria-pressed="false">🍫 Postres</button>
+          </div>
+        </div>
         <div class="menu-controls">
           <div class="category-list" id="categoryList" role="group" aria-label="Filtrar menú por categoría"></div>
           
@@ -216,7 +226,12 @@
   <div class="drawer-backdrop" id="cartBackdrop" hidden></div>
   <aside class="cart-drawer" id="cartDrawer" inert aria-labelledby="cartTitle" aria-modal="true" role="dialog" aria-hidden="true" tabindex="-1">
     <div class="drawer-head"><div><p class="eyebrow"><span class="eyebrow__line"></span> TU SELECCIÓN</p><h2 id="cartTitle">Mi <em>pedido.</em></h2></div><button type="button" class="icon-button" id="closeCart" aria-label="Cerrar carrito"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div>
-    <div class="cart-view" id="cartView"><div id="cartLines" class="cart-lines"></div><div id="cartUpsells" class="cart-upsells" hidden></div><div id="cartSuggest" class="cart-suggest" hidden></div><div class="cart-empty" id="cartEmpty"><div class="cart-empty__icon"><img data-cochi-isotipo data-default-src="/assets/brand/cochi-isotipo-red.png" src="/assets/brand/cochi-isotipo-red.png" alt="" width="70" height="72"></div><h3>Aquí empieza<br>el antojo.</h3><p>Tu pedido todavía está vacío. Date una vuelta por el menú y vuelve cuando tengas tus favoritos.</p><button type="button" class="button button--dark" id="exploreFromCart">Explorar el menú <svg class="ico ico--d" aria-hidden="true"><use href="#i-arrow"/></svg></button><div class="repeat-slot repeat-slot--cart" data-repeat-slot hidden></div></div><div class="cart-bottom" id="cartBottom"><p class="order-schedule-note" id="orderScheduleNote" role="status" hidden></p><div class="cart-subtotal-row"><span>Productos</span><strong id="cartSubtotalUsd">$0.00</strong></div><div class="cart-subtotal-row cart-subtotal-row--ves" id="cartSubtotalVesRow"><span>Estimado en Bs. <small id="cartRateNote"></small></span><strong id="cartSubtotalVes">—</strong></div><button type="button" class="button button--red button--wide" id="startCheckout">Continuar con mis datos <svg class="ico" aria-hidden="true"><use href="#i-arrow"/></svg></button><p class="cart-privacy-note">La entrega y el total final se confirman por WhatsApp.</p><button type="button" class="cart-clear" id="clearCart">Vaciar pedido</button></div></div>
+    <ol class="drawer-steps" id="drawerSteps" aria-label="Pasos de tu pedido">
+      <li class="drawer-step is-active" data-step-target="cart"><span>1</span><b>Tu pedido</b></li>
+      <li class="drawer-step" data-step-target="checkout"><span>2</span><b>Tus datos</b></li>
+      <li class="drawer-step" data-step-target="confirm"><span>3</span><b>Confirmar</b></li>
+    </ol>
+    <div class="cart-view" id="cartView"><div id="cartLines" class="cart-lines"></div><div id="cartUpsells" class="cart-upsells" hidden></div><div id="cartSuggest" class="cart-suggest" hidden></div><div class="cart-empty" id="cartEmpty"><div class="cart-empty__icon"><img data-cochi-isotipo data-default-src="/assets/brand/cochi-isotipo-red.png" src="/assets/brand/cochi-isotipo-red.png" alt="" width="70" height="72"></div><h3>Aquí empieza<br>el antojo.</h3><p>Tu pedido todavía está vacío. Date una vuelta por el menú y vuelve cuando tengas tus favoritos.</p><button type="button" class="button button--dark" id="exploreFromCart">Explorar el menú <svg class="ico ico--d" aria-hidden="true"><use href="#i-arrow"/></svg></button><div class="repeat-slot repeat-slot--cart" data-repeat-slot hidden></div></div><div class="cart-bottom" id="cartBottom"><p class="order-schedule-note" id="orderScheduleNote" role="status" hidden></p><p class="cart-savings-banner" id="cartSavingsBanner" role="status" hidden></p><div class="cart-subtotal-row"><span>Productos</span><strong id="cartSubtotalUsd">$0.00</strong></div><div class="cart-subtotal-row cart-subtotal-row--ves" id="cartSubtotalVesRow"><span>Estimado en Bs. <small id="cartRateNote"></small></span><strong id="cartSubtotalVes">—</strong></div><button type="button" class="button button--red button--wide" id="startCheckout">Continuar con mis datos <svg class="ico" aria-hidden="true"><use href="#i-arrow"/></svg></button><p class="cart-privacy-note">La entrega y el total final se confirman por WhatsApp.</p><button type="button" class="cart-clear" id="clearCart">Vaciar pedido</button></div></div>
     <div class="checkout-view" id="checkoutView" hidden>
       <button type="button" class="back-link" id="backToCart"><svg class="ico ico--back" aria-hidden="true"><use href="#i-arrow"/></svg> Volver al carrito</button><p class="eyebrow"><span class="eyebrow__line"></span> CASI ESTÁ</p><h3>¿A dónde va<br><em>este antojo?</em></h3>
       <form id="checkoutForm" novalidate>
@@ -238,7 +253,7 @@
     </div>
     <div class="confirm-view" id="confirmView" hidden>
       <button type="button" class="back-link" id="backToData"><svg class="ico ico--back" aria-hidden="true"><use href="#i-arrow"/></svg> Editar mis datos</button>
-      <p class="eyebrow"><span class="eyebrow__line"></span> ÚLTIMO PASO</p>
+      <div class="confirm-top-row"><p class="eyebrow"><span class="eyebrow__line"></span> ÚLTIMO PASO</p><span class="confirm-order-badge" id="confirmOrderBadge"></span></div>
       <h3 id="confirmTitle" tabindex="-1">Revisa y <em>confirma.</em></h3>
       <section class="confirm-card" aria-labelledby="cfOrder"><h4 id="cfOrder">Tu pedido</h4><ul class="confirm-lines" id="confirmLines"></ul><dl class="confirm-totals" id="confirmTotals"></dl></section>
       <section class="confirm-card" aria-labelledby="cfData"><h4 id="cfData">Tus datos</h4><dl class="confirm-data" id="confirmData"></dl></section>

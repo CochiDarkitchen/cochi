@@ -1,6 +1,6 @@
-# Cochi · Versión 2: qué cambió y cómo publicarlo
+# Cochi · Versión 3: qué cambió y cómo publicarlo
 
-Esta carpeta es tu proyecto completo de Cochi, ya actualizado. **No se borró nada de lo que ya funcionaba**: el menú, los pedidos por WhatsApp, el panel, los cupones, los temas y la comanda de 58 mm siguen igual. Solo se agregaron mejoras.
+Esta carpeta es tu proyecto completo de Cochi, ya actualizado con el pulido de interfaz, micro-animaciones, experiencia de usuario (UX) y mejoras de productividad en el panel administrativo. **No se borró nada de lo que ya funcionaba**: el menú, los pedidos por WhatsApp, el panel, los cupones, los temas y la comanda de 58 mm siguen igual. Solo se agregaron mejoras.
 
 Tus datos (productos, precios, tasa, pedidos, clientes, fotos y cupones) **no se tocan**: viven en la base de datos de Vercel (Upstash), no en estos archivos.
 
@@ -51,6 +51,11 @@ En Vercel entra a **Deployments**, busca el despliegue anterior (el de antes de 
 | **La intro animada sale una vez por semana** (antes, cada vez que abrían el enlace) y nunca cuando llegan desde un plato compartido | El cliente con hambre no espera 5 segundos cada vez. |
 | **Aviso de tasa una sola vez** arriba del menú (antes se repetía "· tasa anterior" en cada plato) | Menú más limpio. |
 | **Botón "Vaciar pedido"** y "Ya lo envié · empezar un pedido nuevo" | Menos confusión después de enviar. |
+| **Filtros rápidos de antojo** (`🔥 Favoritos`, `🍟 Con promo`, `🍖 Para compartir`, `💸 Hasta $8`, `🍫 Postres`) y botón **×** para limpiar búsqueda | El cliente filtra en un toque según su presupuesto o antojo, y ahora los postres de Cochi Dulce también aparecen en el buscador y en la barra de categorías. |
+| **Píldoras de promoción y personalización en cada tarjeta** (`+ Ración de papas pequeña por $1.00`, `A tu gusto`) y contador en platos con opciones (`1 Elegir +`) | El cliente descubre la promo de papas desde el menú antes de abrir el plato y sabe cuántos lleva en su pedido. |
+| **Ficha de producto interactiva** con estado `✓ LISTO` al completar opciones obligatorias y auto-scroll con aviso visual si olvida elegir una opción | Cero frustración al armar bandejas, alitas o combos con opciones. |
+| **Carrito con barra de progreso de 3 pasos** (`1. Tu pedido → 2. Tus datos → 3. Confirmar`), miniaturas de foto y **banner de ahorro total** (`¡Estás ahorrando $X.XX!`) | Flujo de compra claro, visual y con refuerzo positivo del ahorro. |
+| **Botón "Saltar intro →"** visible desde el primer segundo y coreografía más ágil | Quien entra con prisa salta directo al menú con un toque. |
 
 **Errores corregidos:** el horario decía "8:00 p. m.." (doble punto); las cantidades de opciones saltaban de dos en dos si se abría la misma ficha varias veces.
 
@@ -77,6 +82,14 @@ En Vercel entra a **Deployments**, busca el despliegue anterior (el de antes de 
   - **Editor de opciones:** grupos como "Elige tu salsa" o "Tenders o alitas", obligatorios u opcionales, de una o varias opciones, con precio extra. El panel no te deja guardar si un grupo quedó vacío.
 - **Clientes:** ordenar por pedido más reciente, más pedidos, mayor gasto o nombre; total gastado por cliente; etiqueta **"Cliente frecuente"** (3 pedidos o más).
 - **Estadísticas:** ya no suman los pedidos cancelados; nueva gráfica de **ventas confirmadas por día** (últimos 14 días).
+- **Nuevo en Versión 3 (Panel `/admin`):**
+  - **Barra superior en vivo y pestañas con contadores:** muestra en todo momento si la tienda está `Abierta / Cerrada / En pausa`, la tasa BCV activa, y globos de alerta en las pestañas `Comandas` (pedidos por confirmar) y `Productos` (platos agotados).
+  - **Diseño amplio en computadora (`1080 px`)** y **Vista compacta / detallada** en Comandas para ver 2 columnas de pedidos en horas pico.
+  - **Botones de monto rápido de delivery en 1 toque** (`Gratis $0`, `$1`, `$1.5`, `$2`, `$2.5`, `$3`, `$4`, `$5`) en cada comanda por confirmar.
+  - **Botón "Copiar cobro"** en cada comanda para copiar al portapapeles el desglose en USD, Bs. y datos de pago con un clic, más alerta visual (`⏱`) si un pedido lleva más de 10 minutos esperando confirmación.
+  - **Checklist operativo en Inicio:** verifica de un vistazo si la tasa BCV tiene fecha de hoy, si los datos de pago están listos y cuántos platos tienen fotografía, más buscador instantáneo y botón **"Activar todos"** en *¿Qué hay hoy?*.
+  - **Filtro por categoría y vista previa en vivo** dentro del editor de cada producto para ver cómo lucirá la tarjeta en el menú en USD y Bs.
+  - **Gráfica vertical de barras de 14 días**, porcentaje de conversión y desglose Delivery vs. Retiro en *Estadísticas*.
 - **Atajo:** Ctrl + S guarda los cambios.
 
 ## Recomendaciones de diseñador (no requieren programar)
